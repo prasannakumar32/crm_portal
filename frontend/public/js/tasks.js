@@ -1,0 +1,660 @@
+const TASK_STATUS_OPTIONS = ["Backlog", "In Progress", "Review", "Done"];
+const TASK_PRIORITY_OPTIONS = ["Low", "Normal", "High", "Urgent"];
+
+async function loadTasks(filter = {}) {
+  const params = new URLSearchParams();
+  if (filter.status) params.set("status", filter.status);
+  if (filter.projectId) params.set("projectId", filter.projectId);
+  if (filter.assigneeId) params.set("assigneeId", filter.assigneeId);
+  const path = `/api/tasks${params.toString() ? `?${params.toString()}` : ""}`;
+  const data = await apiJson(path);
+  state.tasks = data.tasks || [];
+  state.taskStatuses = data.statuses || TASK_STATUS_OPTIONS;
+  return data;
+}
+
+async function loadProjects() {
+  const data = await apiJson("/api/tasks/projects");
+  state.projects = data.projects || [];
+  return data;
+}
+
+async function loadTeamUsers() {
+  const data = await apiJson("/api/tasks/users");
+  state.teamUsers = data.users || [];
+  return data;
+}
+
+function createTasksTemplate() {
+  const statuses = state.taskStatuses || TASK_STATUS_OPTIONS;
+  const projects = state.projects || [];
+  const users = state.teamUsers || [];
+  const projectOptions = [`<option value="">All projects</option>`, ...projects.map((project) => `<option value="${project.id}">${project.name}</option>`)];
+  const assigneeOptions = [`<option value="">Unassigned</option>`, ...users.map((user) => `<option value="${user.id}">${user.fullName}</option>`)].join("");
+
+  return createPageShell("Tasks & Tickets", `
+    <section class="card task-board-card">
+      <div class="card-title-row">
+        <h2>Task management</h2>
+        <div class="task-board-actions">
+          ${state.user?.role === "admin" ? `<button class="btn btn-secondary" type="button" id="new-project">New project</button>` : ""}
+          <button class="btn btn-primary" type="button" id="new-task">New task</button>
+        </div>
+      </div>
+      <div class="task-board-tabs">
+        <button class="tab ${state.taskView === "board" ? "active" : ""}" type="button" data-view="board">Board</button>
+        <button class="tab ${state.taskView === "list" ? "active" : ""}" type="button" data-view="list">List</button>
+      </div>
+      <div class="task-filter-row">
+        <div class="task-filter-group">
+          <label>Project</label>
+          <select id="filter-project">
+            ${projectOptions.join("")}
+          </select>
+        </div>
+        <div class="task-filter-group">
+          <label>Status</label>
+          <select id="filter-status">
+            <option value="">All statuses</option>
+            ${statuses.map((status) => `<option value="${status}" ${state.taskFilter.status === status ? "selected" : ""}>${status}</option>`).join("")}
+          </select>
+        </div>
+        <div class="task-filter-group">
+          <label>Assignee</label>
+          <select id="filter-assignee">
+            ${assigneeOptions}
+          </select>
+        </div>
+      </div>
+      ${state.taskView === "board" ? createTaskBoardGrid(state.tasks, TASK_STATUS_OPTIONS) : createTaskListTable()}
+    </section>
+    ${createTaskModalHtml(projects, users)}
+    ${createTaskDetailModalHtml()}
+    ${createProjectModalHtml()}
+  `);
+}
+
+function createTaskListTable() {
+  const rows = (state.tasks || []).map((task) => `
+    <tr data-task-id="${task.id}">
+      <td>${task.title}</td>
+      <td>${task.projectName || "General"}</td>
+      <td>${task.assigneeName || "Unassigned"}</td>
+      <td>${task.status}</td>
+      <td>${task.priority}</td>
+      <td>${task.dueDate ? formatDate(task.dueDate, getUserTimeZone()) : "—"}</td>
+      <td><button type="button" class="mini-action" data-action="view-task" data-id="${task.id}">Details</button></td>
+    </tr>
+  `).join("");
+
+  return `
+      <div class="task-table-wrapper task-compact-table">
+        <table class="task-table">
+          <thead>
+            <tr><th>Title</th><th>Project</th><th>Assignee</th><th>Status</th><th>Priority</th><th>Due</th><th></th></tr>
+          </thead>
+          <tbody id="task-table-body">${rows}</tbody>
+        </table>
+        <p class="empty-note" id="tasks-empty" style="display:${state.tasks.length ? "none" : "block"};">No tasks available. Create a new ticket to get started.</p>
+      </div>
+  `;
+}
+
+function createTaskBoardGrid(tasks, statuses) {
+  return `
+      <div class="task-board-columns" id="task-board-columns">
+        ${statuses.map((status) => `
+          <div class="task-status-column" data-status="${status}">
+            <h3>${status}</h3>
+            <div class="task-status-list">
+              ${(tasks || []).filter((task) => task.status === status).map((task) => createTaskCard(task)).join("")}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+      ${state.tasks.length === 0 ? `<p class="empty-note">No tasks available. Create a new ticket to get started.</p>` : ""}
+  `;
+}
+
+function createTaskCard(task) {
+  return `
+      <div class="task-card" draggable="true" data-task-id="${task.id}">
+        <strong>${task.title}</strong>
+        <div class="task-card-meta">
+          <span>${task.projectName || "General"}</span>
+          <span>${task.assigneeName || "Unassigned"}</span>
+        </div>
+        <div class="task-card-meta">
+          <span>${task.priority}</span>
+          <span>${task.dueDate ? formatDate(task.dueDate, getUserTimeZone()) : "No due date"}</span>
+        </div>
+        <div class="task-card-actions">
+          <button type="button" data-action="view-task" data-id="${task.id}">Details</button>
+        </div>
+      </div>
+  `;
+}
+
+function createTaskModalHtml(projects, users) {
+  return `
+    <div class="task-modal-overlay" id="task-modal" style="display:none;">
+      <div class="task-modal-card">
+        <div class="task-modal-header">
+          <h3 id="task-modal-title">New Task</h3>
+          <button class="icon-button" id="close-task-modal" type="button">×</button>
+        </div>
+        <form id="task-form">
+          <input type="hidden" id="task-id" />
+          <div class="form-section">
+            <h4 class="form-section-title">Basic Information</h4>
+            <div class="form-grid">
+              <label class="field-block full-width"><span>Task Title <span class="required-indicator">*</span></span><input id="task-title" required placeholder="Enter task title" /></label>
+              <label class="field-block full-width"><span>Description</span><textarea id="task-description" rows="3" placeholder="Add task description..."></textarea></label>
+            </div>
+          </div>
+          <div class="form-section">
+            <h4 class="form-section-title">Assignment & Status</h4>
+            <div class="form-grid">
+              <label class="field-block"><span>Project</span><select id="task-project"><option value="">General</option>${projects.map((project) => `<option value="${project.id}">${project.name}</option>`).join("")}</select></label>
+              <label class="field-block"><span>Assignee</span><select id="task-assignee">${[`<option value="">Unassigned</option>`, ...users.map((user) => `<option value="${user.id}">${user.fullName}</option>`)].join("")}</select></label>
+              <label class="field-block"><span>Status</span><select id="task-status">${TASK_STATUS_OPTIONS.map((status) => `<option value="${status}">${status}</option>`).join("")}</select></label>
+              <label class="field-block"><span>Priority</span><select id="task-priority">${TASK_PRIORITY_OPTIONS.map((priority) => `<option value="${priority}">${priority}</option>`).join("")}</select></label>
+              <label class="field-block"><span>Due Date</span><input type="date" id="task-due-date" /></label>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-ghost" type="button" id="cancel-task">Cancel</button>
+            <button class="btn btn-primary" type="submit">Save Task</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+function createTaskDetailModalHtml() {
+  return `
+    <div class="task-modal-overlay" id="task-detail-modal" style="display:none;">
+      <div class="task-modal-card task-detail-card">
+        <div class="task-modal-header">
+          <h3 id="task-detail-title">Task details</h3>
+          <button class="icon-button" id="close-task-detail" type="button">×</button>
+        </div>
+        <div class="task-detail-body" id="task-detail-body"></div>
+      </div>
+    </div>
+  `;
+}
+
+function createProjectModalHtml() {
+  return `
+    <div class="task-modal-overlay" id="project-modal" style="display:none;">
+      <div class="task-modal-card">
+        <div class="task-modal-header">
+          <h3 id="project-modal-title">New Project</h3>
+          <button class="icon-button" id="close-project-modal" type="button">×</button>
+        </div>
+        <form id="project-form">
+          <div class="form-section">
+            <h4 class="form-section-title">Project Details</h4>
+            <div class="form-grid">
+              <label class="field-block full-width"><span>Project Name <span class="required-indicator">*</span></span><input id="project-name" required placeholder="Enter project name" /></label>
+              <label class="field-block full-width"><span>Description</span><textarea id="project-description" rows="3" placeholder="Add project description..."></textarea></label>
+              <label class="field-block"><span>Region</span><select id="project-region">
+                <option value="Australia">Australia</option>
+                <option value="United States">United States</option>
+                <option value="Europe">Europe</option>
+                <option value="Asia">Asia</option>
+                <option value="Other">Other</option>
+              </select></label>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-ghost" type="button" id="cancel-project">Cancel</button>
+            <button class="btn btn-primary" type="submit">Create Project</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+function attachTaskListeners() {
+  const newTaskBtn = document.getElementById("new-task");
+  if (newTaskBtn) newTaskBtn.addEventListener("click", () => openTaskModal());
+
+  const newProjectBtn = document.getElementById("new-project");
+  if (newProjectBtn) newProjectBtn.addEventListener("click", () => openProjectModal());
+
+  const closeModal = document.getElementById("close-task-modal");
+  if (closeModal) closeModal.addEventListener("click", closeTaskModal);
+  const cancelModal = document.getElementById("cancel-task");
+  if (cancelModal) cancelModal.addEventListener("click", closeTaskModal);
+
+  const closeDetail = document.getElementById("close-task-detail");
+  if (closeDetail) closeDetail.addEventListener("click", closeTaskDetailModal);
+
+  const closeProjectModal = document.getElementById("close-project-modal");
+  if (closeProjectModal) closeProjectModal.addEventListener("click", closeProjectModal);
+  const cancelProjectModal = document.getElementById("cancel-project");
+  if (cancelProjectModal) cancelProjectModal.addEventListener("click", closeProjectModal);
+
+  const projectForm = document.getElementById("project-form");
+  if (projectForm) {
+    projectForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await saveProject();
+    });
+  }
+
+  const taskForm = document.getElementById("task-form");
+  if (taskForm) {
+    taskForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await saveTask();
+    });
+  }
+
+  const viewButtons = Array.from(document.querySelectorAll("[data-action='view-task']"));
+  viewButtons.forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      await openTaskDetails(id);
+    });
+  });
+
+  const filterProject = document.getElementById("filter-project");
+  const filterStatus = document.getElementById("filter-status");
+  const filterAssignee = document.getElementById("filter-assignee");
+  if (filterProject) {
+    filterProject.value = state.taskFilter.projectId || "";
+    filterProject.addEventListener("change", async () => {
+      state.taskFilter.projectId = filterProject.value || null;
+      await refreshTasks();
+    });
+  }
+  if (filterStatus) {
+    filterStatus.value = state.taskFilter.status || "";
+    filterStatus.addEventListener("change", async () => {
+      state.taskFilter.status = filterStatus.value || null;
+      await refreshTasks();
+    });
+  }
+  if (filterAssignee) {
+    filterAssignee.value = state.taskFilter.assigneeId || "";
+    filterAssignee.addEventListener("change", async () => {
+      state.taskFilter.assigneeId = filterAssignee.value || null;
+      await refreshTasks();
+    });
+  }
+
+  const tabs = Array.from(document.querySelectorAll(".task-board-tabs .tab"));
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", async () => {
+      const view = tab.dataset.view;
+      if (view) {
+        state.taskView = view;
+        renderTasks();
+      }
+    });
+  });
+
+  setupBoardDragEvents();
+}
+
+function setupBoardDragEvents() {
+  const cards = Array.from(document.querySelectorAll(".task-card[draggable='true']"));
+  cards.forEach((card) => {
+    card.addEventListener("dragstart", (event) => {
+      event.dataTransfer.setData("text/plain", card.dataset.taskId);
+      event.dataTransfer.effectAllowed = "move";
+    });
+  });
+
+  const columns = Array.from(document.querySelectorAll(".task-status-column"));
+  columns.forEach((column) => {
+    column.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      column.classList.add("drag-over");
+    });
+    column.addEventListener("dragleave", () => {
+      column.classList.remove("drag-over");
+    });
+    column.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      column.classList.remove("drag-over");
+      const taskId = event.dataTransfer.getData("text/plain");
+      const newStatus = column.dataset.status;
+      if (!taskId || !newStatus) return;
+      await updateTaskStatus(taskId, newStatus);
+      await refreshTasks();
+    });
+  });
+}
+
+async function openTaskModal(task = null) {
+  await loadProjects();
+  
+  const modal = document.getElementById("task-modal");
+  const titleEl = document.getElementById("task-modal-title");
+  const formId = document.getElementById("task-id");
+  const titleInput = document.getElementById("task-title");
+  const descInput = document.getElementById("task-description");
+  const projectInput = document.getElementById("task-project");
+  const assigneeInput = document.getElementById("task-assignee");
+  const statusInput = document.getElementById("task-status");
+  const priorityInput = document.getElementById("task-priority");
+  const dueInput = document.getElementById("task-due-date");
+
+  if (!modal || !titleEl || !formId || !titleInput || !descInput || !projectInput || !assigneeInput || !statusInput || !priorityInput || !dueInput) return;
+
+  // Update project dropdown with latest projects
+  const projects = state.projects || [];
+  projectInput.innerHTML = `<option value="">General</option>${projects.map((project) => `<option value="${project.id}">${project.name}</option>`).join("")}`;
+
+  titleEl.textContent = task ? "Edit Task" : "New Task";
+  formId.value = task?.id || "";
+  titleInput.value = task?.title || "";
+  descInput.value = task?.description || "";
+  projectInput.value = task?.projectId || "";
+  assigneeInput.value = task?.assigneeId || "";
+  statusInput.value = task?.status || TASK_STATUS_OPTIONS[0];
+  priorityInput.value = task?.priority || "Normal";
+  dueInput.value = task?.dueDate || "";
+
+  modal.style.display = "flex";
+  
+  // Focus on title input for better UX
+  if (!task) {
+    setTimeout(() => titleInput.focus(), 100);
+  }
+}
+
+function closeTaskModal() {
+  const modal = document.getElementById("task-modal");
+  if (modal) modal.style.display = "none";
+}
+
+function openTaskDetailModal() {
+  const modal = document.getElementById("task-detail-modal");
+  if (modal) modal.style.display = "flex";
+}
+
+function closeTaskDetailModal() {
+  const modal = document.getElementById("task-detail-modal");
+  if (modal) modal.style.display = "none";
+}
+
+function openProjectModal() {
+  const modal = document.getElementById("project-modal");
+  const titleEl = document.getElementById("project-modal-title");
+  const nameInput = document.getElementById("project-name");
+  const descInput = document.getElementById("project-description");
+  const regionInput = document.getElementById("project-region");
+
+  if (!modal || !titleEl || !nameInput || !descInput || !regionInput) return;
+
+  titleEl.textContent = "New Project";
+  nameInput.value = "";
+  descInput.value = "";
+  regionInput.value = "Australia";
+
+  modal.style.display = "flex";
+  
+  // Focus on project name input for better UX
+  setTimeout(() => nameInput.focus(), 100);
+}
+
+function closeProjectModal() {
+  const modal = document.getElementById("project-modal");
+  if (modal) modal.style.display = "none";
+}
+
+async function saveTask() {
+  const formId = document.getElementById("task-id");
+  const titleInput = document.getElementById("task-title");
+  const descInput = document.getElementById("task-description");
+  const projectInput = document.getElementById("task-project");
+  const assigneeInput = document.getElementById("task-assignee");
+  const statusInput = document.getElementById("task-status");
+  const priorityInput = document.getElementById("task-priority");
+  const dueInput = document.getElementById("task-due-date");
+
+  if (!titleInput || !projectInput || !statusInput || !priorityInput || !descInput || !assigneeInput || !dueInput) return;
+
+  const payload = {
+    title: titleInput.value.trim(),
+    description: descInput.value.trim(),
+    projectId: projectInput.value || null,
+    assigneeId: assigneeInput.value || null,
+    status: statusInput.value,
+    priority: priorityInput.value,
+    dueDate: dueInput.value || null,
+  };
+
+  if (!payload.title) {
+    alert("Task title is required.");
+    titleInput.focus();
+    return;
+  }
+
+  if (payload.title.length < 3) {
+    alert("Task title must be at least 3 characters long.");
+    titleInput.focus();
+    return;
+  }
+
+  try {
+    if (formId.value) {
+      await apiJson(`/api/tasks/${formId.value}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } else {
+      await apiJson("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    }
+
+    await refreshTasks();
+    closeTaskModal();
+  } catch (error) {
+    alert("Failed to save task. Please try again.");
+    console.error("Save task error:", error);
+  }
+}
+
+async function updateTaskStatus(taskId, status) {
+  if (!taskId) return;
+  await apiJson(`/api/tasks/${taskId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+}
+
+async function saveProject() {
+  const nameInput = document.getElementById("project-name");
+  const descInput = document.getElementById("project-description");
+  const regionInput = document.getElementById("project-region");
+
+  if (!nameInput || !descInput || !regionInput) return;
+
+  const payload = {
+    name: nameInput.value.trim(),
+    description: descInput.value.trim(),
+    region: regionInput.value,
+  };
+
+  if (!payload.name) {
+    alert("Project name is required.");
+    nameInput.focus();
+    return;
+  }
+
+  if (payload.name.length < 3) {
+    alert("Project name must be at least 3 characters long.");
+    nameInput.focus();
+    return;
+  }
+
+  try {
+    await createProject(payload);
+    await loadProjects();
+    renderTasks();
+    closeProjectModal();
+    
+    // Update task modal project dropdown
+    const taskProjectInput = document.getElementById("task-project");
+    if (taskProjectInput) {
+      const projects = state.projects || [];
+      taskProjectInput.innerHTML = `<option value="">General</option>${projects.map((project) => `<option value="${project.id}">${project.name}</option>`).join("")}`;
+    }
+  } catch (error) {
+    alert("Failed to create project. Please try again.");
+    console.error("Create project error:", error);
+  }
+}
+
+async function refreshTasks() {
+  await loadTasks({ status: state.taskFilter.status, projectId: state.taskFilter.projectId, assigneeId: state.taskFilter.assigneeId });
+  renderTasks();
+}
+
+async function openTaskDetails(id) {
+  const response = await apiJson(`/api/tasks/${id}`);
+  if (!response || !response.task) return;
+  state.currentTask = response.task;
+  renderTaskDetail();
+  openTaskDetailModal();
+}
+
+function renderTaskDetail() {
+  const task = state.currentTask;
+  const root = document.getElementById("task-detail-body");
+  if (!root || !task) return;
+
+  const attachments = (task.attachments || []).map((attachment) => `
+    <div class="attachment-row">
+      <strong>${attachment.name}</strong>
+      <p>${attachment.fileName ? `File: ${attachment.fileName}` : `Link: <a href="${attachment.url}" target="_blank" rel="noreferrer">${attachment.url}</a>`}</p>
+      <p class="small-text">Added by ${attachment.authorName} on ${formatDate(attachment.createdAt, getUserTimeZone())}</p>
+    </div>
+  `).join("");
+
+  const comments = (task.comments || []).map((comment) => `
+    <div class="comment-row">
+      <strong>${comment.authorName} · ${formatDate(comment.createdAt, getUserTimeZone())}</strong>
+      <p>${comment.message}</p>
+    </div>
+  `).join("");
+
+  root.innerHTML = `
+    <div class="task-detail-content">
+      <h2 style="margin: 0 0 16px; font-size: 20px; color: var(--text-primary);">${task.title}</h2>
+      <div class="task-detail-grid">
+        <div class="detail-attribute"><strong>Project</strong><span>${task.projectName || "General"}</span></div>
+        <div class="detail-attribute"><strong>Status</strong><span>${task.status}</span></div>
+        <div class="detail-attribute"><strong>Assignee</strong><span>${task.assigneeName || "Unassigned"}</span></div>
+        <div class="detail-attribute"><strong>Priority</strong><span>${task.priority}</span></div>
+        <div class="detail-attribute"><strong>Due</strong><span>${task.dueDate ? formatDate(task.dueDate, getUserTimeZone()) : "No due date"}</span></div>
+        <div class="detail-attribute"><strong>Created by</strong><span>${task.creatorName || "Unknown"}</span></div>
+      </div>
+      <div class="detail-section">
+        <h4>Description</h4>
+        <p>${task.description || "No description provided."}</p>
+      </div>
+      <div class="detail-section">
+        <h4>Comments</h4>
+        ${comments || `<p class="empty-note">No comments yet.</p>`}
+        <form id="comment-form" class="task-detail-form">
+          <div class="field-block full-width">
+            <textarea id="task-comment-text" rows="3" placeholder="Write a comment..." required></textarea>
+          </div>
+          <button class="btn btn-primary" type="submit">Add Comment</button>
+        </form>
+      </div>
+      <div class="detail-section">
+        <h4>Attachments</h4>
+        ${attachments || `<p class="empty-note">No attachments yet.</p>`}
+        <form id="attachment-form" class="task-detail-form">
+          <div class="form-grid">
+            <label class="field-block"><span>Attachment Name</span><input id="attachment-name" placeholder="Attachment name" required /></label>
+            <label class="field-block"><span>Attachment URL</span><input id="attachment-url" placeholder="https://..." required /></label>
+          </div>
+          <button class="btn btn-primary" type="submit">Add Attachment</button>
+        </form>
+      </div>
+    </div>
+  `;
+
+  const commentForm = document.getElementById("comment-form");
+  if (commentForm) {
+    commentForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await submitTaskComment();
+    });
+  }
+
+  const attachmentForm = document.getElementById("attachment-form");
+  if (attachmentForm) {
+    attachmentForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await submitTaskAttachment();
+    });
+  }
+}
+
+async function submitTaskComment() {
+  const text = document.getElementById("task-comment-text");
+  if (!text) return;
+  const message = text.value.trim();
+  if (!message) {
+    alert("Enter a comment before posting.");
+    return;
+  }
+  await postTaskComment(state.currentTask.id, message);
+  text.value = "";
+  const response = await loadTask(state.currentTask.id);
+  state.currentTask = response.task;
+  renderTaskDetail();
+  await refreshTasks();
+}
+
+async function submitTaskAttachment() {
+  const nameInput = document.getElementById("attachment-name");
+  const urlInput = document.getElementById("attachment-url");
+  if (!nameInput || !urlInput) return;
+
+  const name = nameInput.value.trim();
+  const url = urlInput.value.trim();
+  if (!name || !url) {
+    alert("Both attachment name and link are required.");
+    return;
+  }
+
+  await postTaskAttachment(state.currentTask.id, { name, url });
+  nameInput.value = "";
+  urlInput.value = "";
+  const response = await loadTask(state.currentTask.id);
+  state.currentTask = response.task;
+  renderTaskDetail();
+  await refreshTasks();
+}
+
+async function initTasksPage() {
+  state.taskFilter = state.taskFilter || { status: null, projectId: null, assigneeId: null };
+  state.taskView = state.taskView || "board";
+  await Promise.all([loadProjects(), loadTeamUsers()]);
+  await loadTasks(state.taskFilter);
+  root.innerHTML = createTasksTemplate();
+  attachDashboardListeners();
+  attachTaskListeners();
+}
+
+async function renderTasksPage() {
+  await initTasksPage();
+}

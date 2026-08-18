@@ -1,0 +1,56 @@
+[
+  {
+    "id": 1,
+    "userId": 1,
+    "type": "check_in",
+    "timestampUtc": "2026-08-11T01:50:59.419Z",
+    "latitude": 11.238181067522936,
+    "longitude": 78.17539847816514,
+    "address": "Ottakulampudur, Veesanam, Namakkal, Tamil Nadu, 637001, India"
+  },
+  {
+    "id": 2,
+    "userId": 1,
+    "type": "break_start",
+    "timestampUtc": "2026-08-11T01:51:01.852Z",
+    "latitude": 11.238181067522936,
+    "longitude": 78.17539847816514,
+    "address": "Ottakulampudur, Veesanam, Namakkal, Tamil Nadu, 637001, India"
+  },
+  {
+    "id": 3,
+    "userId": 1,
+    "type": "break_end",
+    "timestampUtc": "2026-08-11T01:51:09.985Z",
+    "latitude": 11.238181067522936,
+    "longitude": 78.17539847816514,
+    "address": "Ottakulampudur, Veesanam, Namakkal, Tamil Nadu, 637001, India"
+  },
+  {
+    "id": 4,
+    "userId": 1,
+    "type": "check_out",
+    "timestampUtc": "2026-08-11T01:51:17.178Z",
+    "latitude": 11.238181067522936,
+    "longitude": 78.17539847816514,
+    "address": "Ottakulampudur, Veesanam, Namakkal, Tamil Nadu, 637001, India"
+  },
+  {
+    "id": 5,
+    "userId": 2,
+    "type": "check_in",
+    "timestampUtc": "2026-08-11T01:52:42.828Z",
+    "latitude": 11.238184774555851,
+    "longitude": 78.17539973146825,
+    "address": "Ottakulampudur, Veesanam, Namakkal, Tamil Nadu, 637001, India"
+  },
+  {
+    "id": 6,
+    "userId": 2,
+    "type": "break_start",
+    "timestampUtc": "2026-08-11T01:58:06.051Z",
+    "latitude": 11.238178050909672,
+    "longitude": 78.17539542052347,
+    "address": "Ottakulampudur, Veesanam, Namakkal, Tamil Nadu, 637001, India"
+  }
+]
