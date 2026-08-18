@@ -60,7 +60,7 @@ async function getEventsForUser(userId) {
   return events.map((e) => ({ ...e, id: e._id.toString() }));
 }
 
-async function addEvent({ userId, type, latitude, longitude, address }) {
+async function addEvent({ userId, type, latitude, longitude, address, reason }) {
   const db = await getDb();
   const event = {
     userId: String(userId),
@@ -69,6 +69,7 @@ async function addEvent({ userId, type, latitude, longitude, address }) {
     latitude: typeof latitude === "number" ? latitude : null,
     longitude: typeof longitude === "number" ? longitude : null,
     address: address || null,
+    reason: typeof reason === "string" ? reason.trim().slice(0, 200) || null : null,
   };
   const r = await db.collection("attendance").insertOne(event);
   const e = await db.collection("attendance").findOne({ _id: r.insertedId });

@@ -954,6 +954,39 @@ button {
   position: relative;
 }
 
+.break-reason-card {
+  width: min(500px, calc(100vw - 32px));
+}
+
+.break-reason-options {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.break-reason-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  font-weight: 600;
+  color: #1e293b;
+  cursor: pointer;
+}
+
+.break-reason-option input {
+  width: 18px;
+  height: 18px;
+  accent-color: #f97316;
+}
+
+.break-reason-custom {
+  margin-top: 8px;
+}
+
 @keyframes slideUp {
   from {
     opacity: 0;

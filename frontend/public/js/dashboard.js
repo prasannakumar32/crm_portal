@@ -249,6 +249,7 @@ function createDashboardTemplate() {
           <button class="tab ${state.dashboardPeriod === "week" ? "active" : ""}" type="button" id="tab-week" data-period="week" aria-pressed="${state.dashboardPeriod === "week"}">Week</button>
           <button class="tab ${state.dashboardPeriod === "month" ? "active" : ""}" type="button" id="tab-month" data-period="month" aria-pressed="${state.dashboardPeriod === "month"}">Month</button>
         </div>
+        ${createBreakReasonModalHtml()}
         <div class="hero-area">
           <section class="card profile-card">
             <h2>Hello ${state.user.fullName}</h2>
@@ -318,57 +319,53 @@ function renderDailyHoursChart() {
   if (!canvas) return;
 
   const ctx = canvas.getContext("2d");
-  
-  // Get history data for the current period
+
   const historyRows = getDisplayHistoryRows();
-  
-  // Sort data chronologically (oldest first, newest last) to ensure proper display
   const sortedRows = [...historyRows].sort((a, b) => {
     return new Date(a.date) - new Date(b.date);
   });
-  
-  // Extract data for the chart
+
   const labels = sortedRows.map(day => {
     const date = new Date(day.date);
     return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
   });
-  
+
   const workedHours = sortedRows.map(day => {
     const hours = (day.workedSeconds || 0) / 3600;
     return parseFloat(hours.toFixed(2));
   });
-  
+
   const breakHours = sortedRows.map(day => {
     const hours = (day.breakSeconds || 0) / 3600;
     return parseFloat(hours.toFixed(2));
   });
 
-  // Destroy existing chart if it exists
   if (window.dailyHoursChartInstance) {
     window.dailyHoursChartInstance.destroy();
   }
 
-  // Create new chart
   window.dailyHoursChartInstance = new Chart(ctx, {
     type: "bar",
     data: {
       labels: labels,
       datasets: [
         {
-          label: "Worked Hours",
+          label: "Worked",
           data: workedHours,
-          backgroundColor: "rgba(44, 122, 122, 0.7)",
+          backgroundColor: "rgba(44, 122, 122, 0.75)",
           borderColor: "rgba(44, 122, 122, 1)",
           borderWidth: 1,
           borderRadius: 4,
+          stack: "hours",
         },
         {
-          label: "Break Hours",
+          label: "Break",
           data: breakHours,
           backgroundColor: "rgba(245, 158, 11, 0.7)",
           borderColor: "rgba(245, 158, 11, 1)",
           borderWidth: 1,
           borderRadius: 4,
+          stack: "hours",
         },
       ],
     },
@@ -397,7 +394,7 @@ function renderDailyHoursChart() {
       },
       scales: {
         x: {
-          stacked: false,
+          stacked: true,
           grid: {
             display: false,
           },
@@ -410,7 +407,7 @@ function renderDailyHoursChart() {
           },
         },
         y: {
-          stacked: false,
+          stacked: true,
           beginAtZero: true,
           grid: {
             color: "rgba(191, 214, 215, 0.3)",
@@ -665,6 +662,65 @@ function renderLogin() {
       }
     });
   }
+}
+
+function createBreakReasonModalHtml() {
+  return `
+    <div class="task-modal-overlay" id="break-reason-modal" style="display:none;">
+      <div class="task-modal-card break-reason-card">
+        <div class="task-modal-header">
+          <h3>Why are you taking a break?</h3>
+          <button class="icon-button" id="close-break-reason-modal" type="button" aria-label="Close break reason dialog">×</button>
+        </div>
+        <form id="break-reason-form">
+          <div class="break-reason-options">
+            <label class="break-reason-option">
+              <input type="radio" name="breakReason" value="Breakfast" checked>
+              <span>Breakfast</span>
+            </label>
+            <label class="break-reason-option">
+              <input type="radio" name="breakReason" value="Lunch">
+              <span>Lunch</span>
+            </label>
+            <label class="break-reason-option">
+              <input type="radio" name="breakReason" value="Other">
+              <span>Other</span>
+            </label>
+          </div>
+          <label class="field-block break-reason-custom" id="break-reason-custom-wrap" style="display:none;">
+            <span>Other reason</span>
+            <input id="break-reason-other" type="text" maxlength="200" placeholder="Please specify your reason" />
+          </label>
+          <div class="modal-actions">
+            <button class="btn btn-ghost" type="button" id="cancel-break-reason">Cancel</button>
+            <button class="btn btn-primary" type="submit">Start break</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+function openBreakReasonModal() {
+  const modal = document.getElementById("break-reason-modal");
+  const otherWrap = document.getElementById("break-reason-custom-wrap");
+  if (!modal) return;
+
+  const selected = document.querySelector('input[name="breakReason"]:checked');
+  if (selected && selected.value === "Other") {
+    if (otherWrap) otherWrap.style.display = "block";
+  } else if (otherWrap) {
+    otherWrap.style.display = "none";
+    const otherInput = document.getElementById("break-reason-other");
+    if (otherInput) otherInput.value = "";
+  }
+
+  modal.style.display = "flex";
+}
+
+function closeBreakReasonModal() {
+  const modal = document.getElementById("break-reason-modal");
+  if (modal) modal.style.display = "none";
 }
 
 function renderTimesheets() {
@@ -1048,10 +1104,67 @@ function attachDashboardListeners() {
     });
   }
 
+  const breakReasonInputs = document.querySelectorAll('input[name="breakReason"]');
+  for (const input of breakReasonInputs) {
+    input.addEventListener("change", () => {
+      const otherWrap = document.getElementById("break-reason-custom-wrap");
+      if (!otherWrap) return;
+      otherWrap.style.display = input.value === "Other" ? "block" : "none";
+      if (input.value !== "Other") {
+        const otherInput = document.getElementById("break-reason-other");
+        if (otherInput) otherInput.value = "";
+      }
+    });
+  }
+
+  const breakReasonForm = document.getElementById("break-reason-form");
+  if (breakReasonForm) {
+    breakReasonForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const selected = document.querySelector('input[name="breakReason"]:checked');
+      let reason = selected ? selected.value : "Breakfast";
+      if (reason === "Other") {
+        const otherInput = document.getElementById("break-reason-other");
+        const customValue = otherInput ? otherInput.value.trim() : "";
+        if (!customValue) {
+          alert("Please tell us the reason for your break.");
+          if (otherInput) otherInput.focus();
+          return;
+        }
+        reason = customValue;
+      }
+
+      closeBreakReasonModal();
+      await performAction("break-start", { reason });
+    });
+  }
+
+  const breakReasonClose = document.getElementById("close-break-reason-modal");
+  if (breakReasonClose) breakReasonClose.addEventListener("click", closeBreakReasonModal);
+
+  const breakReasonCancel = document.getElementById("cancel-break-reason");
+  if (breakReasonCancel) breakReasonCancel.addEventListener("click", closeBreakReasonModal);
+
+  const breakReasonOverlay = document.getElementById("break-reason-modal");
+  if (breakReasonOverlay) {
+    breakReasonOverlay.addEventListener("click", (event) => {
+      if (event.target === breakReasonOverlay) closeBreakReasonModal();
+    });
+  }
+
+  const breakStart = document.getElementById("btn-break-start");
+  if (breakStart) {
+    breakStart.addEventListener("click", () => openBreakReasonModal());
+  }
+
   for (const [buttonId, endpoint] of Object.entries(actionEndpointMap)) {
     const button = document.getElementById(buttonId);
     if (button) {
-      button.addEventListener("click", () => performAction(endpoint));
+      if (endpoint === "break-start") {
+        button.addEventListener("click", () => openBreakReasonModal());
+      } else {
+        button.addEventListener("click", () => performAction(endpoint));
+      }
     }
   }
 }
@@ -1171,14 +1284,14 @@ function createCell(content, className) {
   return td;
 }
 
-async function performAction(endpoint) {
+async function performAction(endpoint, extraPayload = {}) {
   setBusy(true);
   try {
     const loc = await captureLocation();
     const data = await apiJson(`/api/attendance/${endpoint}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(loc),
+      body: JSON.stringify({ ...loc, ...extraPayload }),
     });
     state.status = data.status;
     state.todayEvents = data.today;

@@ -26,13 +26,22 @@ function recordAction(type) {
       });
     }
 
-    const { latitude, longitude, address } = req.body || {};
+    const { latitude, longitude, address, reason } = req.body || {};
+
+    if (type === "break_start") {
+      const normalizedReason = typeof reason === "string" ? reason.trim() : "";
+      if (!normalizedReason) {
+        return res.status(400).json({ error: "Please select a break reason before starting your break." });
+      }
+    }
+
     const event = await db.addEvent({
       userId,
       type,
       latitude: typeof latitude === "number" ? latitude : null,
       longitude: typeof longitude === "number" ? longitude : null,
       address: typeof address === "string" ? address.slice(0, 300) : null,
+      reason: typeof reason === "string" ? reason.trim().slice(0, 200) : null,
     });
 
     const updated = await db.getEventsForUser(userId);
