@@ -2,6 +2,10 @@
 async function apiJson(path, options = {}) {
   const res = await fetch(apiUrl(path), {
     credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
     ...options,
   });
   const data = await res.json();

@@ -10,10 +10,16 @@ services:
         value: 3333
       - key: NODE_ENV
         value: production
+      - key: MONGO_URI
+        fromDatabase:
+          name: crm-portal-mongodb
+          property: connectionString
       - key: MONGODB_URI
         fromDatabase:
           name: crm-portal-mongodb
           property: connectionString
+      - key: MONGO_DB_NAME
+        value: crm_portal
       - key: SESSION_SECRET
         generateValue: true
 

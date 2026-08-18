@@ -106,7 +106,12 @@ router.post("/login", async (req, res) => {
 });
 
 router.post("/logout", (req, res) => {
-  req.session.destroy(() => {
+  req.session.destroy((err) => {
+    if (err) {
+      console.error("Session destroy error:", err);
+      return res.status(500).json({ error: "Logout failed" });
+    }
+    res.clearCookie("crm_session");
     res.clearCookie("connect.sid");
     res.json({ ok: true });
   });

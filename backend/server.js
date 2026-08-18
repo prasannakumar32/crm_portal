@@ -22,10 +22,31 @@ const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toSt
 app.use(express.json());
 
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
+  const allowedOrigins = [
+    "http://localhost:3000",
+    "http://localhost:3333",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3333"
+  ];
+
+  const origin = req.headers.origin;
+  let isRenderOrigin = false;
+  try {
+    if (origin) {
+      const hostname = new URL(origin).hostname;
+      isRenderOrigin = hostname.endsWith(".onrender.com") || hostname === "onrender.com";
+    }
+  } catch (err) {
+    isRenderOrigin = false;
+  }
+
+  if (allowedOrigins.includes(origin) || isRenderOrigin || !origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin || "*");
+  }
+
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") {
     return res.sendStatus(204);
   }
@@ -39,9 +60,11 @@ app.use(
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 12, // 12 hours
-      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production", // Secure cookies in production
+      maxAge: 1000 * 60 * 60 * 24, // 24 hours
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     },
+    name: "crm_session", // Custom session name
   })
 );
 
@@ -61,14 +84,14 @@ app.use((req, res) => {
 });
 
 async function startServer() {
-  if (!process.env.MONGO_URI) {
-    console.error("\n❌ STARTUP ERROR: MONGO_URI is not set");
+  if (!process.env.MONGO_URI && !process.env.MONGODB_URI) {
+    console.error("\n❌ STARTUP ERROR: MONGO_URI/MONGODB_URI is not set");
     console.error("─".repeat(60));
     console.error("REQUIRED SETUP STEPS:");
     console.error("1. Open your MongoDB Atlas cluster");
     console.error("2. Go to: Database → Database Users");
     console.error("3. Copy the connection string from MongoDB Atlas");
-    console.error("4. Edit the .env file and set MONGO_URI=<your-connection-string>");
+    console.error("4. Set MONGO_URI=<your-connection-string> or MONGODB_URI=<your-connection-string>");
     console.error("5. Replace <USERNAME> and <PASSWORD> with your MongoDB user credentials");
     console.error("─".repeat(60));
     process.exit(1);

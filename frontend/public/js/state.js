@@ -39,7 +39,9 @@ const enabledByStatus = {
   checked_out: [],
 };
 
-const API_BASE_URL = "http://localhost:3333";
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? "http://localhost:3333"
+  : (window.location.origin || "");
 
 const state = {
   page: location.hash.slice(1) || "home",

@@ -1,10 +1,10 @@
 const { MongoClient } = require("mongodb");
 
-const MONGO_URI = process.env.MONGO_URI || null;
-const DB_NAME = process.env.MONGO_DB_NAME || "crm_portal";
+const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || null;
+const DB_NAME = process.env.MONGO_DB_NAME || process.env.MONGODB_DB_NAME || "crm_portal";
 
 if (!MONGO_URI) {
-  console.warn("MONGO_URI not set — MongoDB connections will fail until you set MONGO_URI to your Atlas connection string.");
+  console.warn("MONGO_URI/MONGODB_URI not set — MongoDB connections will fail until you set a valid Atlas connection string.");
 }
 
 let client = null;
