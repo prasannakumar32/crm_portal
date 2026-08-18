@@ -1,0 +1,24 @@
+services:
+  # Single web service for the entire CRM Portal
+  - type: web
+    name: crm-portal
+    env: node
+    buildCommand: npm install
+    startCommand: node backend/server.js
+    envVars:
+      - key: PORT
+        value: 3333
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        fromDatabase:
+          name: crm-portal-mongodb
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+
+databases:
+  # MongoDB Database
+  - name: crm-portal-mongodb
+    databaseName: crm_portal
+    user: crm_user
