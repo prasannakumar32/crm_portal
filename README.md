@@ -41,17 +41,6 @@ The server listens on port 3333 by default; set `PORT=xxxx` to change it.
    - Go to: Network Access → IP Access List
    - Add your IP address or allow 0.0.0.0/0 for development
 7. Copy `.env.example` to `.env` and update with your credentials
-
-### Local MongoDB (Development)
-
-You can also use a local MongoDB instance if you prefer:
-
-```bash
-# Install MongoDB locally
-# Update .env with local connection string
-MONGO_URI=mongodb://localhost:27017/crm_portal
-```
-
 ## Deploy to Render.com
 
 1. **Push to GitHub**:

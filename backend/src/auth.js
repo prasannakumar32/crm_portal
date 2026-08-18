@@ -31,7 +31,7 @@ async function canCreateUsers(req, res, next) {
 
 router.post("/create-user", canCreateUsers, async (req, res) => {
   try {
-    const { username, password, fullName, role = "user", location, timezone } = req.body || {};
+    const { username, password, fullName, role = "user", location, timezone, dailyBreakAllowanceMinutes } = req.body || {};
 
     if (!username || !password || !fullName) {
       return res.status(400).json({ error: "Full name, username and password are all required." });
@@ -63,6 +63,7 @@ router.post("/create-user", canCreateUsers, async (req, res) => {
       role: selectedRole,
       location: location || null,
       timezone: timezone || null,
+      dailyBreakAllowanceMinutes: dailyBreakAllowanceMinutes || 60,
     });
     res.json({
       id: user.id,
@@ -71,6 +72,7 @@ router.post("/create-user", canCreateUsers, async (req, res) => {
       role: user.role,
       location: user.location || null,
       timezone: user.timezone || null,
+      dailyBreakAllowanceMinutes: user.dailyBreakAllowanceMinutes || 60,
     });
   } catch (err) {
     res.status(500).json({ error: err.message || 'Internal error' });
@@ -101,6 +103,7 @@ router.post("/login", async (req, res) => {
     role: user.role,
     location: user.location || null,
     timezone: user.timezone || null,
+    dailyBreakAllowanceMinutes: user.dailyBreakAllowanceMinutes || 60,
     loggedInAt: req.session.loginAt,
   });
 });
@@ -129,9 +132,42 @@ router.get("/me", async (req, res) => {
       role: user.role,
       location: user.location || null,
       timezone: user.timezone || null,
+      dailyBreakAllowanceMinutes: user.dailyBreakAllowanceMinutes || 60,
       loggedInAt: req.session.loginAt || null,
     },
   });
+});
+
+router.put("/users/:id/break-allowance", canCreateUsers, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { dailyBreakAllowanceMinutes } = req.body || {};
+
+    if (!id) {
+      return res.status(400).json({ error: "User ID is required." });
+    }
+    if (dailyBreakAllowanceMinutes === undefined || dailyBreakAllowanceMinutes === null) {
+      return res.status(400).json({ error: "Daily break allowance minutes is required." });
+    }
+    if (dailyBreakAllowanceMinutes < 0) {
+      return res.status(400).json({ error: "Daily break allowance must be a positive number." });
+    }
+
+    const user = await db.updateUserBreakAllowance(id, dailyBreakAllowanceMinutes);
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    res.json({
+      id: user.id,
+      username: user.username,
+      fullName: user.fullName,
+      role: user.role,
+      dailyBreakAllowanceMinutes: user.dailyBreakAllowanceMinutes,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Internal error' });
+  }
 });
 
 module.exports = router;

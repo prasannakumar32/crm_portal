@@ -57,6 +57,7 @@ const state = {
   taskStatuses: [],
   projects: [],
   teamUsers: [],
+  users: [],
   taskFilter: { status: null, projectId: null, assigneeId: null },
   taskView: "board",
   currentTask: null,
@@ -65,13 +66,14 @@ const state = {
     { id: 2, date: "2026-08-12", shift: "Afternoon", start: "13:00", end: "21:00", location: "Kolkata Remote", owner: "Priya", status: "Planned" },
     { id: 3, date: "2026-08-13", shift: "Morning", start: "08:00", end: "16:00", location: "Sydney Office", owner: "Rohan", status: "Confirmed" },
   ],
-  leaveData: [
-    { id: 1, name: "Vinayagar Chathurthi", type: "Holiday", startDate: "2026-09-14", location: "India", status: "Approved" },
-    { id: 2, name: "Mahatma Gandhi Jayanti", type: "Holiday", startDate: "2026-10-02", location: "India", status: "Approved" },
-    { id: 3, name: "Ayudha pooja", type: "Holiday", startDate: "2026-10-19", location: "India", status: "Approved" },
-  ],
+  leaveData: [],
   locationLabel: "Locating…",
   clock: new Date(),
+  breakAllowance: {
+    dailyBreakAllowanceMinutes: 60,
+    usedBreakMinutes: 0,
+    remainingBreakMinutes: 60,
+  },
 };
 
 function formatTime(iso, timeZone) {

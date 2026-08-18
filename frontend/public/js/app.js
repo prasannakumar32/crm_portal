@@ -6,6 +6,7 @@ async function init() {
     if (page === "dashboard") {
       loadToday().catch(() => {});
       loadHistory().catch(() => {});
+      loadLeaves().catch(() => {});
     }
     if (page === "tasks") {
       initTasksPage().catch(() => {});
@@ -18,8 +19,11 @@ async function init() {
     if (state.page === "dashboard") {
       await loadToday();
       await loadHistory(state.dashboardPeriod);
+      await loadLeaves();
     } else if (state.page === "tasks") {
       await initTasksPage();
+    } else if (state.page === "user-management") {
+      await loadUsers();
     }
   }
   render();

@@ -23,12 +23,12 @@ async function loadMe() {
     state.user = data.user;
     hydrateProfileFromUser();
     if (state.user) {
-      const allowedLoggedInPages = ["dashboard", "timesheets", "timeoff", "work-schedules", "tasks"];
+      const allowedLoggedInPages = ["dashboard", "timesheets", "timeoff", "work-schedules", "tasks", "user-management"];
       if (!allowedLoggedInPages.includes(state.page)) {
         setPage("dashboard", false);
         return;
       }
-    } else if (state.page === "dashboard" || state.page === "timesheets" || state.page === "timeoff" || state.page === "work-schedules" || state.page === "tasks") {
+    } else if (state.page === "dashboard" || state.page === "timesheets" || state.page === "timeoff" || state.page === "work-schedules" || state.page === "tasks" || state.page === "user-management") {
       setPage("login", false);
       return;
     }
@@ -41,6 +41,9 @@ async function loadToday() {
   const data = await apiJson("/api/attendance/today");
   state.status = data.status;
   state.todayEvents = data.today;
+  if (data.breakAllowance) {
+    state.breakAllowance = data.breakAllowance;
+  }
   updateDashboardValues();
 }
 
@@ -143,5 +146,35 @@ async function deleteLeave(id) {
   if (!id) return null;
   return apiJson(`/api/attendance/leaves/${id}`, {
     method: "DELETE",
+  });
+}
+
+async function createUser(payload) {
+  if (!payload) return null;
+  return apiJson("/api/auth/create-user", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+async function loadUsers() {
+  try {
+    const data = await apiJson("/api/tasks/users");
+    state.users = data.users || [];
+    return data;
+  } catch (error) {
+    console.log("Users API not available, using empty data");
+    state.users = [];
+    return { users: [] };
+  }
+}
+
+async function updateUserBreakAllowance(userId, dailyBreakAllowanceMinutes) {
+  if (!userId || dailyBreakAllowanceMinutes === undefined) return null;
+  return apiJson(`/api/auth/users/${userId}/break-allowance`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dailyBreakAllowanceMinutes }),
   });
 }

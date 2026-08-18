@@ -40,7 +40,7 @@ async function attachNames(tasks) {
 
 router.get("/users", async (req, res) => {
   const users = await db.getUsers();
-  res.json({ users: users.map((user) => ({ id: user.id, fullName: user.fullName, role: user.role, location: user.location, timezone: user.timezone })) });
+  res.json({ users: users.map((user) => ({ id: user.id, fullName: user.fullName, role: user.role, location: user.location, timezone: user.timezone, dailyBreakAllowanceMinutes: user.dailyBreakAllowanceMinutes || 60 })) });
 });
 
 router.get("/projects", async (req, res) => {

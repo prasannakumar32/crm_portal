@@ -33,6 +33,22 @@ function recordAction(type) {
       if (!normalizedReason) {
         return res.status(400).json({ error: "Please select a break reason before starting your break." });
       }
+
+      // Check break time allowance
+      const { todayEvents } = logic.getStatus(events, userTimeZone);
+      const durations = logic.computeDurations(todayEvents);
+      const dailyBreakAllowanceMinutes = user.dailyBreakAllowanceMinutes || 60;
+      const usedBreakMinutes = Math.floor(durations.breakSeconds / 60);
+
+      if (usedBreakMinutes >= dailyBreakAllowanceMinutes) {
+        return res.status(409).json({
+          error: `You have exceeded your daily break allowance of ${dailyBreakAllowanceMinutes} minutes. You've used ${usedBreakMinutes} minutes today.`,
+          status,
+          breakAllowanceExceeded: true,
+          usedBreakMinutes,
+          dailyBreakAllowanceMinutes,
+        });
+      }
     }
 
     const event = await db.addEvent({
@@ -63,7 +79,20 @@ router.get("/today", async (req, res) => {
   const events = await db.getEventsForUser(req.session.userId);
   const { status, todayEvents } = logic.getStatus(events, userTimeZone);
   const durations = logic.computeDurations(todayEvents);
-  res.json({ status, today: todayEvents, durations });
+  const dailyBreakAllowanceMinutes = user.dailyBreakAllowanceMinutes || 60;
+  const usedBreakMinutes = Math.floor(durations.breakSeconds / 60);
+  const remainingBreakMinutes = Math.max(0, dailyBreakAllowanceMinutes - usedBreakMinutes);
+
+  res.json({ 
+    status, 
+    today: todayEvents, 
+    durations,
+    breakAllowance: {
+      dailyBreakAllowanceMinutes,
+      usedBreakMinutes,
+      remainingBreakMinutes,
+    }
+  });
 });
 
 router.get("/history", async (req, res) => {

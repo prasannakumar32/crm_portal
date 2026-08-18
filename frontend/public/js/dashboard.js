@@ -55,10 +55,15 @@ function setPage(page, updateHash = true) {
 // ============================================================================
 
 function render() {
-  const allowedLoggedInPages = ["dashboard", "timesheets", "timeoff", "work-schedules", "tasks"];
+  const allowedLoggedInPages = ["dashboard", "timesheets", "timeoff", "work-schedules", "tasks", "user-management"];
 
   if (state.user) {
     if (!allowedLoggedInPages.includes(state.page)) {
+      setPage("dashboard", false);
+      return;
+    }
+    // Admin-only pages
+    if (state.page === "user-management" && state.user.role !== "admin") {
       setPage("dashboard", false);
       return;
     }
@@ -87,6 +92,9 @@ function render() {
       break;
     case "tasks":
       renderTasksPage();
+      break;
+    case "user-management":
+      renderUserManagement();
       break;
     default:
       if (state.user) {
@@ -131,6 +139,7 @@ function createPageShell(title, contentHtml) {
   const dbTimezone = state.user?.timezone || "AEST (UTC+10:00)";
   const zoneAbbr = getDisplayTimeZoneLabel();
   const loggedInDisplay = getLoginTimeText();
+  const isAdmin = state.user?.role === "admin";
 
   return `<div class="portal-shell">
     <aside class="sidebar">
@@ -145,6 +154,8 @@ function createPageShell(title, contentHtml) {
         <div class="nav-title${state.page === "tasks" ? " active" : ""}" data-page="tasks"><span>Tasks</span></div>
         <div class="nav-section-title">Settings</div>
         <div class="nav-title${state.page === "work-schedules" ? " active" : ""}" data-page="work-schedules"><span>Work Schedules</span></div>
+        ${isAdmin ? `<div class="nav-section-title">Admin</div>
+        <div class="nav-title${state.page === "user-management" ? " active" : ""}" data-page="user-management"><span>User Management</span></div>` : ""}
       </nav>
       <div class="profile-mini">
         <div class="profile-dot"></div>
@@ -224,12 +235,19 @@ function createDashboardTemplate() {
   const overtimeLabel = `Overtime ${periodDesc}`;
   const heroSubtext = `Here's your dashboard for ${periodDesc}.`;
 
+  // Break allowance display
+  const breakAllowance = state.breakAllowance || { dailyBreakAllowanceMinutes: 60, usedBreakMinutes: 0, remainingBreakMinutes: 60 };
+  const breakAllowancePercent = Math.min(100, Math.round((breakAllowance.usedBreakMinutes / breakAllowance.dailyBreakAllowanceMinutes) * 100));
+  const breakAllowanceStatus = breakAllowance.remainingBreakMinutes <= 0 ? 'exceeded' : breakAllowance.remainingBreakMinutes <= 15 ? 'warning' : 'ok';
+
   const leaveRows = (state.leaveData || []).map((item) => {
     const start = new Date(item.startDate);
     const month = start.toLocaleString("en", { month: "short" }).toUpperCase();
     const day = String(start.getDate()).padStart(2, "0");
     const title = item.name || "Time off";
     const category = item.type || "Leave";
+    const end = item.endDate ? new Date(item.endDate) : start;
+    const range = item.endDate ? `${formatDate(item.startDate, getUserTimeZone())} – ${formatDate(item.endDate, getUserTimeZone())}` : formatDate(item.startDate, getUserTimeZone());
     const adminActions = state.user?.role === "admin" ? `<div class="row-admin-actions">
       <button type="button" class="mini-action" data-action="edit-leave" data-id="${item.id}">Edit</button>
       <button type="button" class="mini-action danger" data-action="delete-leave" data-id="${item.id}">Delete</button>
@@ -239,8 +257,10 @@ function createDashboardTemplate() {
       <div>
         <div class="holiday-name">${title}</div>
         <div class="holiday-place">${category} · ${item.location || dbLocation}</div>
+        <div class="holiday-meta">${range}</div>
+        <div class="holiday-status status-${item.status?.toLowerCase() || "approved"}">${item.status || "Approved"}</div>
+        ${adminActions}
       </div>
-      ${adminActions}
     </div>`;
   }).join("");
 
@@ -260,9 +280,14 @@ function createDashboardTemplate() {
           <aside class="card holidays-card">
             <div class="card-title-row">
               <h2>Upcoming Holidays and Time Off</h2>
+              ${state.user?.role === "admin" ? `
+              <div class="admin-inline-actions">
+                <button class="btn btn-primary" type="button" id="add-leave-dashboard">Add Time Off</button>
+              </div>` : ""}
             </div>
-            <div class="holiday-list">${leaveRows}</div>
+            <div class="holiday-list">${leaveRows || '<p class="empty-note">No upcoming holidays or time off scheduled.</p>'}</div>
           </aside>
+          ${createLeaveModalHtml()}
         </div>
         <section class="card tracked-card">
           <div class="card-heading"><h2>Tracked Hours</h2></div>
@@ -276,6 +301,16 @@ function createDashboardTemplate() {
               <div class="status-row">
                 <span class="status-pill status-${state.status}"><span class="dot"></span><span id="status-text">${statusLabels[state.status]}</span></span>
                 <span class="location-strip" id="location-strip">${state.locationLabel}</span>
+              </div>
+              <div class="break-allowance-bar" id="break-allowance-bar">
+                <div class="break-allowance-info">
+                  <span class="break-allowance-label">Daily Break Allowance</span>
+                  <span class="break-allowance-time">${breakAllowance.usedBreakMinutes}/${breakAllowance.dailyBreakAllowanceMinutes} min used</span>
+                </div>
+                <div class="break-allowance-progress">
+                  <div class="break-allowance-fill break-allowance-${breakAllowanceStatus}" style="width: ${breakAllowancePercent}%"></div>
+                </div>
+                <span class="break-allowance-remaining">${breakAllowance.remainingBreakMinutes} min remaining</span>
               </div>
               <div class="chart-container" style="margin-top:18px;">
                 <canvas id="daily-hours-chart"></canvas>
@@ -429,12 +464,23 @@ function renderDailyHoursChart() {
 }
 
 function renderDashboard() {
-  root.innerHTML = createPageShell("Dashboard", createDashboardTemplate());
-  attachDashboardListeners();
-  updateDashboardValues();
-  renderTimeline();
-  renderHistory();
-  renderDailyHoursChart();
+  loadLeaves().then(() => {
+    root.innerHTML = createPageShell("Dashboard", createDashboardTemplate());
+    attachDashboardListeners();
+    updateDashboardValues();
+    renderTimeline();
+    renderHistory();
+    renderDailyHoursChart();
+  }).catch(() => {
+    // Fallback: render with empty leaves data
+    state.leaveData = [];
+    root.innerHTML = createPageShell("Dashboard", createDashboardTemplate());
+    attachDashboardListeners();
+    updateDashboardValues();
+    renderTimeline();
+    renderHistory();
+    renderDailyHoursChart();
+  });
 }
 
 function createTimesheetsTemplate() {
@@ -478,6 +524,49 @@ function createTimesheetsTemplate() {
             <tbody id="history-body">${historyRows}</tbody>
           </table>
           <p class="empty-note" id="history-empty" style="display:${state.historyData.length ? "none" : "block"};">No history yet.</p>
+        </div>
+      `;
+}
+
+function createLeaveModalHtml() {
+  const isAdmin = state.user?.role === "admin";
+  const dbLocation = state.user?.location || "Australia";
+  return `
+        <div class="task-modal-overlay" id="leave-modal" style="display:none;">
+          <div class="task-modal-card">
+            <div class="task-modal-header">
+              <h3 id="leave-modal-title">New Time Off Request</h3>
+              <button class="icon-button" id="close-leave-modal" type="button">×</button>
+            </div>
+            <form id="leave-form">
+              <input type="hidden" id="leave-id" />
+              <div class="form-section">
+                <h4 class="form-section-title">Leave Details</h4>
+                <div class="form-grid">
+                  <label class="field-block full-width"><span>Leave Name <span class="required-indicator">*</span></span><input id="leave-name" required placeholder="Enter leave name" /></label>
+                  <label class="field-block"><span>Type</span><select id="leave-type"><option value="Holiday">Holiday</option><option value="Annual Leave">Annual Leave</option><option value="Sick Leave">Sick Leave</option><option value="Personal Leave">Personal Leave</option></select></label>
+                  <label class="field-block"><span>Location</span><input id="leave-location" value="${dbLocation}" required /></label>
+                </div>
+              </div>
+              <div class="form-section">
+                <h4 class="form-section-title">Date & Status</h4>
+                <div class="form-grid">
+                  <label class="field-block"><span>Start Date <span class="required-indicator">*</span></span><input id="leave-date" type="date" required /></label>
+                  <label class="field-block"><span>End Date <span class="required-indicator">*</span></span><input id="leave-end-date" type="date" required /></label>
+                  <label class="field-block full-width"><span>Reason <span class="required-indicator">*</span></span><input id="leave-reason" required placeholder="Enter reason for leave" /></label>
+                  ${isAdmin ? `
+                  <label class="field-block"><span>Status</span><select id="leave-status"><option value="Approved">Approved</option><option value="Pending">Pending</option><option value="Requested">Requested</option><option value="Rejected">Rejected</option></select></label>
+                  ` : `<input type="hidden" id="leave-status" value="Requested" />`}
+                </div>
+              </div>
+              <div class="form-section">
+                <div class="form-grid form-actions-grid">
+                  <button class="btn btn-ghost" type="button" id="cancel-leave">Cancel</button>
+                  <button class="btn btn-primary" type="submit" id="submit-leave">Submit Request</button>
+                </div>
+              </div>
+            </form>
+          </div>
         </div>
       `;
 }
@@ -528,42 +617,7 @@ function createTimeOffTemplate() {
           </div>
           <div class="holiday-list">${leaveRows || '<p class="empty-note">No time off requests yet.</p>'}</div>
         </section>
-        <div class="task-modal-overlay" id="leave-modal" style="display:none;">
-          <div class="task-modal-card">
-            <div class="task-modal-header">
-              <h3 id="leave-modal-title">New Time Off Request</h3>
-              <button class="icon-button" id="close-leave-modal" type="button">×</button>
-            </div>
-            <form id="leave-form">
-              <input type="hidden" id="leave-id" />
-              <div class="form-section">
-                <h4 class="form-section-title">Leave Details</h4>
-                <div class="form-grid">
-                  <label class="field-block full-width"><span>Leave Name <span class="required-indicator">*</span></span><input id="leave-name" required placeholder="Enter leave name" /></label>
-                  <label class="field-block"><span>Type</span><select id="leave-type"><option value="Holiday">Holiday</option><option value="Annual Leave">Annual Leave</option><option value="Sick Leave">Sick Leave</option><option value="Personal Leave">Personal Leave</option></select></label>
-                  <label class="field-block"><span>Location</span><input id="leave-location" value="${dbLocation}" required /></label>
-                </div>
-              </div>
-              <div class="form-section">
-                <h4 class="form-section-title">Date & Status</h4>
-                <div class="form-grid">
-                  <label class="field-block"><span>Start Date <span class="required-indicator">*</span></span><input id="leave-date" type="date" required /></label>
-                  <label class="field-block"><span>End Date <span class="required-indicator">*</span></span><input id="leave-end-date" type="date" required /></label>
-                  <label class="field-block full-width"><span>Reason <span class="required-indicator">*</span></span><input id="leave-reason" required placeholder="Enter reason for leave" /></label>
-                  ${isAdmin ? `
-                  <label class="field-block"><span>Status</span><select id="leave-status"><option value="Approved">Approved</option><option value="Pending">Pending</option><option value="Requested">Requested</option><option value="Rejected">Rejected</option></select></label>
-                  ` : `<input type="hidden" id="leave-status" value="Requested" />`}
-                </div>
-              </div>
-              <div class="form-section">
-                <div class="form-grid form-actions-grid">
-                  <button class="btn btn-ghost" type="button" id="cancel-leave">Cancel</button>
-                  <button class="btn btn-primary" type="submit" id="submit-leave">Submit Request</button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
+        ${createLeaveModalHtml()}
       `;
 }
 
@@ -672,6 +726,9 @@ function createBreakReasonModalHtml() {
           <h3>Why are you taking a break?</h3>
           <button class="icon-button" id="close-break-reason-modal" type="button" aria-label="Close break reason dialog">×</button>
         </div>
+        <div class="break-allowance-info" id="break-allowance-modal-info">
+          You have 60 minutes of break time remaining today (allowance: 60 min).
+        </div>
         <form id="break-reason-form">
           <div class="break-reason-options">
             <label class="break-reason-option">
@@ -715,6 +772,13 @@ function openBreakReasonModal() {
     if (otherInput) otherInput.value = "";
   }
 
+  // Update break allowance info in modal if exists
+  const breakAllowanceInfo = document.getElementById("break-allowance-modal-info");
+  if (breakAllowanceInfo) {
+    const breakAllowance = state.breakAllowance || { remainingBreakMinutes: 60, dailyBreakAllowanceMinutes: 60 };
+    breakAllowanceInfo.textContent = `You have ${breakAllowance.remainingBreakMinutes} minutes of break time remaining today (allowance: ${breakAllowance.dailyBreakAllowanceMinutes} min).`;
+  }
+
   modal.style.display = "flex";
 }
 
@@ -734,12 +798,14 @@ function renderTimeOff() {
   loadLeaves().then(() => {
     root.innerHTML = createPageShell("Time Off", createTimeOffTemplate());
     attachDashboardListeners();
+    attachLeaveModalListeners();
     updateDashboardValues();
   }).catch(() => {
     // Fallback: render with empty leaves data
     state.leaveData = [];
     root.innerHTML = createPageShell("Time Off", createTimeOffTemplate());
     attachDashboardListeners();
+    attachLeaveModalListeners();
     updateDashboardValues();
   });
 }
@@ -1104,6 +1170,45 @@ function attachDashboardListeners() {
     });
   }
 
+  // Dashboard holiday row actions - redirect to Time Off page for editing
+  const holidayRows = document.querySelectorAll("[data-action='edit-leave']");
+  for (const btn of holidayRows) {
+    btn.addEventListener("click", () => {
+      setPage("timeoff");
+    });
+  }
+
+  const deleteHolidayRows = document.querySelectorAll("[data-action='delete-leave']");
+  for (const btn of deleteHolidayRows) {
+    btn.addEventListener("click", async () => {
+      const target = btn.dataset.id;
+      if (!confirm("Are you sure you want to delete this time off entry?")) {
+        return;
+      }
+      try {
+        await apiJson(`/api/attendance/leaves/${target}`, {
+          method: "DELETE",
+        });
+        await loadLeaves();
+        renderDashboard();
+      } catch (error) {
+        console.error("Failed to delete leave:", error);
+        alert("Failed to delete leave. Please try again.");
+      }
+    });
+  }
+
+  // Add Leave button on dashboard
+  const addLeaveDashboard = document.getElementById("add-leave-dashboard");
+  if (addLeaveDashboard) {
+    addLeaveDashboard.addEventListener("click", () => {
+      openLeaveModal(null);
+    });
+  }
+
+  // Leave modal event listeners (shared between dashboard and timeoff pages)
+  attachLeaveModalListeners();
+
   const breakReasonInputs = document.querySelectorAll('input[name="breakReason"]');
   for (const input of breakReasonInputs) {
     input.addEventListener("change", () => {
@@ -1154,14 +1259,23 @@ function attachDashboardListeners() {
 
   const breakStart = document.getElementById("btn-break-start");
   if (breakStart) {
-    breakStart.addEventListener("click", () => openBreakReasonModal());
+    breakStart.addEventListener("click", () => {
+      // Check if break allowance is exceeded before opening modal
+      const breakAllowance = state.breakAllowance || { remainingBreakMinutes: 60 };
+      if (breakAllowance.remainingBreakMinutes <= 0) {
+        alert(`You have exceeded your daily break allowance of ${breakAllowance.dailyBreakAllowanceMinutes} minutes. You've used ${breakAllowance.usedBreakMinutes} minutes today.`);
+        return;
+      }
+      openBreakReasonModal();
+    });
   }
 
   for (const [buttonId, endpoint] of Object.entries(actionEndpointMap)) {
     const button = document.getElementById(buttonId);
     if (button) {
       if (endpoint === "break-start") {
-        button.addEventListener("click", () => openBreakReasonModal());
+        // Skip - we handle this separately above
+        continue;
       } else {
         button.addEventListener("click", () => performAction(endpoint));
       }
@@ -1295,10 +1409,17 @@ async function performAction(endpoint, extraPayload = {}) {
     });
     state.status = data.status;
     state.todayEvents = data.today;
+    if (data.breakAllowance) {
+      state.breakAllowance = data.breakAllowance;
+    }
     updateDashboardValues();
     await loadHistory();
   } catch (err) {
-    alert(err.error || "That action couldn't be completed.");
+    if (err.breakAllowanceExceeded) {
+      alert(`Break allowance exceeded: ${err.error}`);
+    } else {
+      alert(err.error || "That action couldn't be completed.");
+    }
   } finally {
     setBusy(false);
   }
@@ -1401,6 +1522,55 @@ function closeLeaveModal() {
   if (modal) modal.style.display = "none";
 }
 
+function attachLeaveModalListeners() {
+  const closeModal = document.getElementById("close-leave-modal");
+  if (closeModal) closeModal.addEventListener("click", closeLeaveModal);
+  const cancelModal = document.getElementById("cancel-leave");
+  if (cancelModal) cancelModal.addEventListener("click", closeLeaveModal);
+
+  const leaveOverlay = document.getElementById("leave-modal");
+  if (leaveOverlay) {
+    leaveOverlay.addEventListener("click", (event) => {
+      if (event.target === leaveOverlay) closeLeaveModal();
+    });
+  }
+
+  const leaveForm = document.getElementById("leave-form");
+  if (leaveForm) {
+    leaveForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const leaveId = document.getElementById("leave-id").value;
+      const payload = {
+        name: document.getElementById("leave-name").value,
+        type: document.getElementById("leave-type").value,
+        location: document.getElementById("leave-location").value,
+        startDate: document.getElementById("leave-date").value,
+        endDate: document.getElementById("leave-end-date").value,
+        reason: document.getElementById("leave-reason").value,
+        status: document.getElementById("leave-status").value || "Requested",
+      };
+      if (!payload.name || !payload.startDate || !payload.endDate || !payload.reason) return;
+      try {
+        if (leaveId) {
+          await updateLeave(leaveId, payload);
+        } else {
+          await createLeave(payload);
+        }
+        await loadLeaves();
+        closeLeaveModal();
+        if (state.page === "timeoff") {
+          renderTimeOff();
+        } else {
+          renderDashboard();
+        }
+      } catch (error) {
+        console.error("Failed to save leave:", error);
+        alert("Failed to save leave. Please try again.");
+      }
+    });
+  }
+}
+
 function getBrowserLocation() {
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
@@ -1435,5 +1605,291 @@ async function captureLocation() {
   }
   const address = await reverseGeocode(coords.latitude, coords.longitude);
   return { latitude: coords.latitude, longitude: coords.longitude, address };
+}
+
+function createUserManagementTemplate() {
+  const users = state.users || [];
+  const userRows = users.map((user) => `
+    <tr>
+      <td>${user.fullName || "—"}</td>
+      <td>${user.username || "—"}</td>
+      <td><span class="badge role-badge role-${user.role || "user"}">${user.role || "user"}</span></td>
+      <td>${user.location || "—"}</td>
+      <td>${user.timezone || "—"}</td>
+      <td>${user.dailyBreakAllowanceMinutes || 60} min</td>
+      <td>
+        <button type="button" class="mini-action" data-action="edit-break-allowance" data-id="${user.id}" data-break-allowance="${user.dailyBreakAllowanceMinutes || 60}">Edit Break</button>
+      </td>
+    </tr>
+  `).join("");
+
+  return `<section class="card users-card">
+          <div class="card-title-row">
+            <h2>User Management</h2>
+            <div class="admin-inline-actions">
+              <button class="btn btn-primary" type="button" id="add-user">Create New User</button>
+              <button class="btn btn-ghost" type="button" id="refresh-users">↻ Refresh</button>
+            </div>
+          </div>
+          <div class="users-table-container">
+            <table class="users-table">
+              <thead>
+                <tr>
+                  <th>Full Name</th>
+                  <th>Username</th>
+                  <th>Role</th>
+                  <th>Location</th>
+                  <th>Timezone</th>
+                  <th>Daily Break Allowance</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="users-body">${userRows || '<tr><td colspan="7" class="empty-note">No users found. Create the first user to get started.</td></tr>'}</tbody>
+            </table>
+          </div>
+        </section>
+        <div class="task-modal-overlay" id="user-modal" style="display:none;">
+          <div class="task-modal-card">
+            <div class="task-modal-header">
+              <h3 id="user-modal-title">Create New User</h3>
+              <button class="icon-button" id="close-user-modal" type="button">×</button>
+            </div>
+            <form id="user-form">
+              <div class="form-section">
+                <h4 class="form-section-title">User Information</h4>
+                <div class="form-grid">
+                  <label class="field-block full-width"><span>Full Name <span class="required-indicator">*</span></span><input id="user-fullname" required placeholder="Enter full name" /></label>
+                  <label class="field-block"><span>Username <span class="required-indicator">*</span></span><input id="user-username" required placeholder="Enter username (3-32 characters)" /></label>
+                  <label class="field-block"><span>Password <span class="required-indicator">*</span></span><input id="user-password" type="password" required placeholder="Enter password (min 8 characters)" /></label>
+                </div>
+              </div>
+              <div class="form-section">
+                <h4 class="form-section-title">Role & Location</h4>
+                <div class="form-grid">
+                  <label class="field-block"><span>Role</span><select id="user-role"><option value="user">User</option><option value="admin">Admin</option></select></label>
+                  <label class="field-block"><span>Location</span><input id="user-location" placeholder="e.g., Australia, India" /></label>
+                  <label class="field-block"><span>Timezone</span><select id="user-timezone">
+                    <option value="">Select timezone</option>
+                    <option value="Australia/Sydney">Australia/Sydney (AEST)</option>
+                    <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+                    <option value="UTC">UTC</option>
+                  </select></label>
+                </div>
+              </div>
+              <div class="form-section">
+                <h4 class="form-section-title">Break Time Settings</h4>
+                <div class="form-grid">
+                  <label class="field-block"><span>Daily Break Allowance (minutes)</span><input id="user-break-allowance" type="number" min="0" max="480" value="60" placeholder="60" /></label>
+                </div>
+              </div>
+              <div class="form-section">
+                <div class="form-grid form-actions-grid">
+                  <button class="btn btn-ghost" type="button" id="cancel-user">Cancel</button>
+                  <button class="btn btn-primary" type="submit" id="submit-user">Create User</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+        <div class="task-modal-overlay" id="break-allowance-modal" style="display:none;">
+          <div class="task-modal-card">
+            <div class="task-modal-header">
+              <h3>Edit Break Allowance</h3>
+              <button class="icon-button" id="close-break-allowance-modal" type="button">×</button>
+            </div>
+            <form id="break-allowance-form">
+              <input type="hidden" id="break-allowance-user-id" />
+              <div class="form-section">
+                <h4 class="form-section-title">Break Time Settings</h4>
+                <div class="form-grid">
+                  <label class="field-block full-width"><span>Daily Break Allowance (minutes)</span><input id="break-allowance-minutes" type="number" min="0" max="480" placeholder="60" /></label>
+                </div>
+              </div>
+              <div class="form-section">
+                <div class="form-grid form-actions-grid">
+                  <button class="btn btn-ghost" type="button" id="cancel-break-allowance">Cancel</button>
+                  <button class="btn btn-primary" type="submit" id="submit-break-allowance">Update Allowance</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      `;
+}
+
+function renderUserManagement() {
+  loadUsers().then(() => {
+    root.innerHTML = createPageShell("User Management", createUserManagementTemplate());
+    attachDashboardListeners();
+    updateUserManagementListeners();
+  }).catch(() => {
+    state.users = [];
+    root.innerHTML = createPageShell("User Management", createUserManagementTemplate());
+    attachDashboardListeners();
+    updateUserManagementListeners();
+  });
+}
+
+function updateUserManagementListeners() {
+  const addUserButton = document.getElementById("add-user");
+  if (addUserButton) {
+    addUserButton.addEventListener("click", () => openUserModal());
+  }
+
+  const refreshButton = document.getElementById("refresh-users");
+  if (refreshButton) {
+    refreshButton.addEventListener("click", async () => {
+      await loadUsers();
+      if (state.page === "user-management") renderUserManagement();
+    });
+  }
+
+  // Break allowance edit buttons
+  const editBreakButtons = document.querySelectorAll("[data-action='edit-break-allowance']");
+  for (const btn of editBreakButtons) {
+    btn.addEventListener("click", () => {
+      const userId = btn.dataset.id;
+      const currentAllowance = btn.dataset.breakAllowance || 60;
+      openBreakAllowanceModal(userId, currentAllowance);
+    });
+  }
+
+  // Break allowance form
+  const breakAllowanceForm = document.getElementById("break-allowance-form");
+  if (breakAllowanceForm) {
+    breakAllowanceForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const userId = document.getElementById("break-allowance-user-id").value;
+      const dailyBreakAllowanceMinutes = parseInt(document.getElementById("break-allowance-minutes").value) || 60;
+
+      if (!userId) {
+        alert("User ID is required.");
+        return;
+      }
+
+      try {
+        await updateUserBreakAllowance(userId, dailyBreakAllowanceMinutes);
+        await loadUsers();
+        closeBreakAllowanceModal();
+        if (state.page === "user-management") renderUserManagement();
+      } catch (error) {
+        console.error("Failed to update break allowance:", error);
+        alert(error.error || "Failed to update break allowance. Please try again.");
+      }
+    });
+  }
+
+  const cancelBreakAllowanceButton = document.getElementById("cancel-break-allowance");
+  if (cancelBreakAllowanceButton) {
+    cancelBreakAllowanceButton.addEventListener("click", closeBreakAllowanceModal);
+  }
+
+  const closeBreakAllowanceModalButton = document.getElementById("close-break-allowance-modal");
+  if (closeBreakAllowanceModalButton) {
+    closeBreakAllowanceModalButton.addEventListener("click", closeBreakAllowanceModal);
+  }
+
+  const breakAllowanceModalOverlay = document.getElementById("break-allowance-modal");
+  if (breakAllowanceModalOverlay) {
+    breakAllowanceModalOverlay.addEventListener("click", (event) => {
+      if (event.target === breakAllowanceModalOverlay) closeBreakAllowanceModal();
+    });
+  }
+
+  const userForm = document.getElementById("user-form");
+  if (userForm) {
+    userForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const payload = {
+        fullName: document.getElementById("user-fullname").value,
+        username: document.getElementById("user-username").value,
+        password: document.getElementById("user-password").value,
+        role: document.getElementById("user-role").value,
+        location: document.getElementById("user-location").value || null,
+        timezone: document.getElementById("user-timezone").value || null,
+        dailyBreakAllowanceMinutes: parseInt(document.getElementById("user-break-allowance").value) || 60,
+      };
+
+      if (!payload.fullName || !payload.username || !payload.password) {
+        alert("Please fill in all required fields.");
+        return;
+      }
+
+      try {
+        await createUser(payload);
+        await loadUsers();
+        closeUserModal();
+        if (state.page === "user-management") renderUserManagement();
+      } catch (error) {
+        console.error("Failed to create user:", error);
+        alert(error.error || "Failed to create user. Please try again.");
+      }
+    });
+  }
+
+  const cancelUserButton = document.getElementById("cancel-user");
+  if (cancelUserButton) {
+    cancelUserButton.addEventListener("click", closeUserModal);
+  }
+
+  const closeUserModalButton = document.getElementById("close-user-modal");
+  if (closeUserModalButton) {
+    closeUserModalButton.addEventListener("click", closeUserModal);
+  }
+
+  const userModalOverlay = document.getElementById("user-modal");
+  if (userModalOverlay) {
+    userModalOverlay.addEventListener("click", (event) => {
+      if (event.target === userModalOverlay) closeUserModal();
+    });
+  }
+}
+
+function openUserModal() {
+  const modal = document.getElementById("user-modal");
+  if (!modal) return;
+
+  const fullnameInput = document.getElementById("user-fullname");
+  const usernameInput = document.getElementById("user-username");
+  const passwordInput = document.getElementById("user-password");
+  const roleInput = document.getElementById("user-role");
+  const locationInput = document.getElementById("user-location");
+  const timezoneInput = document.getElementById("user-timezone");
+  const breakAllowanceInput = document.getElementById("user-break-allowance");
+
+  if (fullnameInput) fullnameInput.value = "";
+  if (usernameInput) usernameInput.value = "";
+  if (passwordInput) passwordInput.value = "";
+  if (roleInput) roleInput.value = "user";
+  if (locationInput) locationInput.value = state.user?.location || "";
+  if (timezoneInput) timezoneInput.value = state.user?.timezone || "";
+  if (breakAllowanceInput) breakAllowanceInput.value = "60";
+
+  modal.style.display = "flex";
+  setTimeout(() => fullnameInput.focus(), 100);
+}
+
+function openBreakAllowanceModal(userId, currentAllowance) {
+  const modal = document.getElementById("break-allowance-modal");
+  if (!modal) return;
+
+  const userIdInput = document.getElementById("break-allowance-user-id");
+  const allowanceInput = document.getElementById("break-allowance-minutes");
+
+  if (userIdInput) userIdInput.value = userId;
+  if (allowanceInput) allowanceInput.value = currentAllowance || 60;
+
+  modal.style.display = "flex";
+  setTimeout(() => allowanceInput.focus(), 100);
+}
+
+function closeBreakAllowanceModal() {
+  const modal = document.getElementById("break-allowance-modal");
+  if (modal) modal.style.display = "none";
+}
+
+function closeUserModal() {
+  const modal = document.getElementById("user-modal");
+  if (modal) modal.style.display = "none";
 }
 

@@ -29,7 +29,7 @@ async function findUserById(id) {
   }
 }
 
-async function createUser({ username, passwordHash, fullName, role = "user", location = null, timezone = null }) {
+async function createUser({ username, passwordHash, fullName, role = "user", location = null, timezone = null, dailyBreakAllowanceMinutes = 60 }) {
   const db = await getDb();
   const normalizedUsername = username.trim().toLowerCase();
   const doc = {
@@ -40,6 +40,7 @@ async function createUser({ username, passwordHash, fullName, role = "user", loc
     role,
     location: location || null,
     timezone: timezone || null,
+    dailyBreakAllowanceMinutes: dailyBreakAllowanceMinutes || 60,
     createdAt: new Date().toISOString(),
   };
   const r = await db.collection("users").insertOne(doc);
@@ -248,6 +249,21 @@ async function deleteLeave(id) {
   }
 }
 
+async function updateUserBreakAllowance(userId, dailyBreakAllowanceMinutes) {
+  const db = await getDb();
+  try {
+    const result = await db.collection("users").findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      { $set: { dailyBreakAllowanceMinutes, updatedAt: new Date().toISOString() } },
+      { returnDocument: "after" }
+    );
+    if (!result.value) return null;
+    return { ...result.value, id: result.value._id.toString() };
+  } catch (err) {
+    return null;
+  }
+}
+
 module.exports = {
   getUsers,
   findUserByUsername,
@@ -268,4 +284,5 @@ module.exports = {
   createLeave,
   updateLeave,
   deleteLeave,
+  updateUserBreakAllowance,
 };
