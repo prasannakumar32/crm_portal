@@ -244,10 +244,10 @@ function createDashboardTemplate() {
     </div>`;
   }).join("");
 
-  return `<div class="period-tabs">
-          <button class="tab ${state.dashboardPeriod === "day" ? "active" : ""}" type="button" id="tab-day" data-period="day">Day</button>
-          <button class="tab ${state.dashboardPeriod === "week" ? "active" : ""}" type="button" id="tab-week" data-period="week">Week</button>
-          <button class="tab ${state.dashboardPeriod === "month" ? "active" : ""}" type="button" id="tab-month" data-period="month">Month</button>
+  return `<div class="period-tabs" role="tablist" aria-label="Select dashboard period">
+          <button class="tab ${state.dashboardPeriod === "day" ? "active" : ""}" type="button" id="tab-day" data-period="day" aria-pressed="${state.dashboardPeriod === "day"}">Today</button>
+          <button class="tab ${state.dashboardPeriod === "week" ? "active" : ""}" type="button" id="tab-week" data-period="week" aria-pressed="${state.dashboardPeriod === "week"}">Week</button>
+          <button class="tab ${state.dashboardPeriod === "month" ? "active" : ""}" type="button" id="tab-month" data-period="month" aria-pressed="${state.dashboardPeriod === "month"}">Month</button>
         </div>
         <div class="hero-area">
           <section class="card profile-card">

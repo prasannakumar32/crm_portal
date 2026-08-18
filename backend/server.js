@@ -14,11 +14,13 @@ const { connect: connectMongo } = require("./src/mongo");
 
 const app = express();
 const PORT = process.env.PORT || 3333;
+const isProduction = process.env.NODE_ENV === "production";
 
 // A fresh random session secret each boot is fine for local/small-team use.
 // For a real deployment, set SESSION_SECRET yourself so sessions survive restarts.
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex");
 
+app.set("trust proxy", 1);
 app.use(express.json());
 
 app.use((req, res, next) => {
@@ -58,11 +60,12 @@ app.use(
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    proxy: true,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // Secure cookies in production
+      secure: isProduction,
       maxAge: 1000 * 60 * 60 * 24, // 24 hours
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      sameSite: isProduction ? "none" : "lax",
     },
     name: "crm_session", // Custom session name
   })

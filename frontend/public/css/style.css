@@ -549,25 +549,40 @@ button {
 }
 
 .period-tabs {
-  display: flex;
+  display: inline-flex;
   gap: 8px;
   align-items: center;
   margin-bottom: 20px;
+  padding: 6px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .period-tabs .tab {
   border: none;
   background: transparent;
-  color: #8a97aa;
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-size: 12px;
+  color: #475569;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
   font-weight: 700;
+  letter-spacing: 0.01em;
+  transition: all 0.2s ease;
+  min-width: 90px;
+  cursor: pointer;
+}
+
+.period-tabs .tab:hover {
+  background: rgba(148, 163, 184, 0.12);
+  color: #0f172a;
 }
 
 .period-tabs .tab.active {
-  background: #f97316;
+  background: linear-gradient(135deg, #f97316, #ea580c);
   color: white;
+  box-shadow: 0 6px 14px rgba(249, 115, 22, 0.25);
 }
 
 .hero-area {
