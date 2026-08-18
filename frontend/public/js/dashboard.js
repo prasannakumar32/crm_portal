@@ -1171,8 +1171,8 @@ function attachDashboardListeners() {
   }
 
   // Dashboard holiday row actions - redirect to Time Off page for editing
-  const holidayRows = document.querySelectorAll("[data-action='edit-leave']");
-  for (const btn of holidayRows) {
+  const dashboardHolidayRows = document.querySelectorAll("[data-action='edit-leave']");
+  for (const btn of dashboardHolidayRows) {
     btn.addEventListener("click", () => {
       setPage("timeoff");
     });

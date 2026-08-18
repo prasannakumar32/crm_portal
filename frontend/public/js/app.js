@@ -13,7 +13,14 @@ async function init() {
     }
   });
 
-  setInterval(tickClock, 1000);
+  // Start clock after a short delay to ensure functions are loaded
+  setTimeout(() => {
+    if (typeof tickClock === 'function') {
+      setInterval(tickClock, 1000);
+      tickClock();
+    }
+  }, 100);
+
   await loadMe();
   if (state.user) {
     if (state.page === "dashboard") {
