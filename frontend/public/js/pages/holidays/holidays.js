@@ -22,11 +22,10 @@ function createHolidaysTemplate() {
   `).join("");
 
   return `<section class="card holidays-page-card">
-    <div class="holidays-page-header">
+    <div class="card-title-row holidays-page-header">
       <div>
         <span class="eyebrow">Public calendar</span>
         <h2>${countryName} Holidays ${state.holidayYear}</h2>
-        <p>Official public holidays for your selected country.</p>
       </div>
       <div class="holiday-year-controls">
         <button class="icon-button holiday-year-button" type="button" data-holiday-year="previous" aria-label="Previous year">‹</button>
@@ -39,7 +38,6 @@ function createHolidaysTemplate() {
       <button class="holiday-switch-button${state.holidayCountry === "AU" ? " active" : ""}" type="button" data-holiday-country="AU" role="tab" aria-selected="${state.holidayCountry === "AU"}">Australia</button>
     </div>
     ${state.holidayLoading ? '<div class="calendar-loading">Loading public holidays…</div>' : `<div class="calendar-holiday-list">${holidayRows || '<p class="empty-note">No holidays found for this year.</p>'}</div>`}
-    <div class="calendar-source">${state.holidaySource === "fallback" ? "Showing local calendar data" : "Loaded from public holiday calendar"}</div>
   </section>`;
 }
 

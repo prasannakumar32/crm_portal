@@ -1,9 +1,7 @@
 const SCRIPT_REGISTRY = Object.freeze([
   "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js",
   "js/core/state.js",
-  "js/pages/page-registry.js",
   "js/core/api.js",
-  "js/forms/form-registry.js",
   "js/pages/dashboard/dashboard.js",
   "js/pages/holidays/holidays.js",
   "js/pages/timesheet/timesheetform.js",
@@ -18,6 +16,20 @@ const SCRIPT_REGISTRY = Object.freeze([
   "js/pages/tasks/projectform.js",
   "js/pages/work-schedules/workscheduleform.js",
 ]);
+
+const PAGE_DEFINITIONS = Object.freeze({
+  dashboard: { render: () => renderDashboard() },
+  timesheets: { render: () => renderTimesheets() },
+  timeoff: { render: () => renderTimeOff() },
+  holidays: { render: () => renderHolidays() },
+  "work-schedules": { render: () => renderWorkSchedules() },
+  tasks: { render: () => renderTasksPage() },
+  "user-management": { render: () => renderEmployeeManagement() },
+});
+
+function getPageDefinition(page) {
+  return PAGE_DEFINITIONS[page] || null;
+}
 
 function loadScript(source) {
   return new Promise((resolve, reject) => {
@@ -38,6 +50,9 @@ async function init() {
       loadToday().catch(() => {});
       loadHistory().catch(() => {});
       loadLeaves().catch(() => {});
+      loadPublicHolidays().then(() => {
+        if (state.page === "dashboard") renderDashboard();
+      }).catch(() => {});
     }
     if (page === "holidays") {
       loadPublicHolidays().then(() => render()).catch(() => render());
@@ -64,6 +79,7 @@ async function init() {
       await loadToday();
       await loadHistory(state.dashboardPeriod);
       await loadLeaves();
+      await loadPublicHolidays();
     } else if (state.page === "holidays") {
       await loadPublicHolidays();
     } else if (state.page === "tasks") {

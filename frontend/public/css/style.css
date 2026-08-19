@@ -714,6 +714,18 @@ button {
 .calendar-holiday-list {
   display: grid;
   gap: 8px;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.calendar-holiday-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.calendar-holiday-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #9bc8c7;
 }
 
 .calendar-holiday-row {
@@ -741,8 +753,7 @@ button {
   font-size: 14px;
 }
 
-.calendar-holiday-content span,
-.calendar-source {
+.calendar-holiday-content span {
   color: #64748b;
   font-size: 12px;
 }
@@ -912,28 +923,19 @@ button {
   margin-bottom: 14px;
 }
 
-.load-more-leaves {
-  width: 100%;
-  margin-top: 14px;
-  padding: 9px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #256b72;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
+.leave-summary-card .holiday-list {
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 6px;
 }
 
-.load-more-leaves:hover {
-  background: #f0fdfa;
-  border-color: #7dd3c7;
+.leave-summary-card .holiday-list::-webkit-scrollbar {
+  width: 6px;
 }
 
-.load-more-leaves span {
-  color: #94a3b8;
-  font-weight: 600;
+.leave-summary-card .holiday-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #9bc8c7;
 }
 
 .icon-button {
@@ -2187,6 +2189,89 @@ button {
   min-height: 120px;
 }
 
+.timesheet-entry-card {
+  margin-bottom: 18px;
+}
+
+.timesheet-entry-card h2 {
+  margin: 0 0 4px;
+}
+
+.timesheet-entry-card p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.timesheet-step-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.timesheet-step {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.timesheet-step.complete {
+  border-color: #a7d8ca;
+  background: #f3fbf8;
+}
+
+.timesheet-step-marker {
+  color: #94a3b8;
+}
+
+.timesheet-step.complete .timesheet-step-marker {
+  color: var(--success);
+}
+
+.timesheet-step-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.timesheet-step-copy span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.timesheet-step-action {
+  min-width: 104px;
+}
+
+.timesheet-break-reason {
+  display: grid;
+  gap: 6px;
+  max-width: 280px;
+  margin-top: 16px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.timesheet-break-reason select {
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--text-primary);
+  font: inherit;
+}
+
+#timesheet-form-error {
+  min-height: 20px;
+  margin-top: 12px;
+}
+
 @media (max-width: 1100px) {
   .hero-area,
   .metric-panel,
@@ -2200,8 +2285,23 @@ button {
 }
 
 @media (max-width: 760px) {
+  .timesheet-step {
+    grid-template-columns: 28px 1fr;
+  }
+
+  .timesheet-step-action {
+    grid-column: 2;
+    justify-self: start;
+  }
+
   .portal-shell {
     display: block;
+  }
+
+  .holidays-page-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
   }
 
   .sidebar {

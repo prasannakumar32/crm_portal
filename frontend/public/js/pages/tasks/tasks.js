@@ -136,43 +136,6 @@ function createTaskCard(task) {
   `;
 }
 
-function createTaskModalHtml(projects, users) {
-  return `
-    <div class="task-modal-overlay" id="task-modal" style="display:none;">
-      <div class="task-modal-card">
-        <div class="task-modal-header">
-          <h3 id="task-modal-title">New Task</h3>
-          <button class="icon-button" id="close-task-modal" type="button">×</button>
-        </div>
-        <form id="task-form">
-          <input type="hidden" id="task-id" />
-          <div class="form-section">
-            <h4 class="form-section-title">Basic Information</h4>
-            <div class="form-grid">
-              <label class="field-block full-width"><span>Task Title <span class="required-indicator">*</span></span><input id="task-title" required placeholder="Enter task title" /></label>
-              <label class="field-block full-width"><span>Description</span><textarea id="task-description" rows="3" placeholder="Add task description..."></textarea></label>
-            </div>
-          </div>
-          <div class="form-section">
-            <h4 class="form-section-title">Assignment & Status</h4>
-            <div class="form-grid">
-              <label class="field-block"><span>Project</span><select id="task-project"><option value="">General</option>${projects.map((project) => `<option value="${project.id}">${project.name} (${project.clientName || 'No Client'})</option>`).join("")}</select></label>
-              <label class="field-block"><span>Assignee</span><select id="task-assignee">${[`<option value="">Unassigned</option>`, ...users.map((user) => `<option value="${user.id}">${user.fullName}</option>`)].join("")}</select></label>
-              <label class="field-block"><span>Status</span><select id="task-status">${TASK_STATUS_OPTIONS.map((status) => `<option value="${status}">${status}</option>`).join("")}</select></label>
-              <label class="field-block"><span>Priority</span><select id="task-priority">${TASK_PRIORITY_OPTIONS.map((priority) => `<option value="${priority}">${priority}</option>`).join("")}</select></label>
-              <label class="field-block"><span>Due Date</span><div class="date-time-control"><input type="date" id="task-due-date" /></div></label>
-            </div>
-          </div>
-          <div class="modal-actions">
-            <button class="btn btn-ghost" type="button" id="cancel-task">Cancel</button>
-            <button class="btn btn-primary" type="submit">Save Task</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  `;
-}
-
 function createTaskDetailModalHtml() {
   return `
     <div class="task-modal-overlay" id="task-detail-modal" style="display:none;">
@@ -182,40 +145,6 @@ function createTaskDetailModalHtml() {
           <button class="icon-button" id="close-task-detail" type="button">×</button>
         </div>
         <div class="task-detail-body" id="task-detail-body"></div>
-      </div>
-    </div>
-  `;
-}
-
-function createProjectModalHtml() {
-  return `
-    <div class="task-modal-overlay" id="project-modal" style="display:none;">
-      <div class="task-modal-card">
-        <div class="task-modal-header">
-          <h3 id="project-modal-title">New Project</h3>
-          <button class="icon-button" id="close-project-modal" type="button">×</button>
-        </div>
-        <form id="project-form">
-          <div class="form-section">
-            <h4 class="form-section-title">Project Details</h4>
-            <div class="form-grid">
-              <label class="field-block full-width"><span>Project Name <span class="required-indicator">*</span></span><input id="project-name" required placeholder="Enter project name" /></label>
-              <label class="field-block"><span>Client Name <span class="required-indicator">*</span></span><input id="project-client-name" required placeholder="Enter client name" /></label>
-              <label class="field-block"><span>Manager Name <span class="required-indicator">*</span></span><input id="project-manager-name" required placeholder="Enter manager name" /></label>
-              <label class="field-block full-width"><span>Description</span><textarea id="project-description" rows="3" placeholder="Add project description..."></textarea></label>
-              <label class="field-block"><span>Stack Used <span class="required-indicator">*</span></span><input id="project-stack" required placeholder="e.g., React, Node.js, MongoDB" /></label>
-              <label class="field-block"><span>Location <span class="required-indicator">*</span></span><select id="project-location">
-                <option value="India">India</option>
-                <option value="Australia">Australia</option>
-                <option value="Other">Other</option>
-              </select></label>
-            </div>
-          </div>
-          <div class="modal-actions">
-            <button class="btn btn-ghost" type="button" id="cancel-project">Cancel</button>
-            <button class="btn btn-primary" type="submit">Create Project</button>
-          </div>
-        </form>
       </div>
     </div>
   `;

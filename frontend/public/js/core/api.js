@@ -1,15 +1,35 @@
 // @ts-nocheck
 async function apiJson(path, options = {}) {
-  const res = await fetch(apiUrl(path), {
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-    ...options,
-  });
-  const data = await res.json();
-  if (!res.ok) throw data;
+  const url = apiUrl(path);
+  const method = options.method || "GET";
+  let res;
+
+  try {
+    res = await fetch(url, {
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+      ...options,
+    });
+  } catch (error) {
+    console.error("[API] Fetch failed", { method, path, url, error });
+    throw error;
+  }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (error) {
+    console.error("[API] Invalid JSON response", { method, path, status: res.status, error });
+    throw new Error(`Invalid response from ${path}`);
+  }
+
+  if (!res.ok) {
+    console.error("[API] Request failed", { method, path, status: res.status, data });
+    throw data;
+  }
   return data;
 }
 

@@ -22,7 +22,7 @@ function createTimeOffTemplate() {
     return `<div class="holiday-row">
       <span class="holiday-date">${month}<br/>${day}</span>
       <div>
-        <div class="holiday-name">${item.name || "Time off"}</div>
+        <div class="holiday-name">${item.name || "Leave request"}</div>
         <div class="holiday-place">${item.type || "Leave"} · ${item.location || dbLocation}</div>
         <div class="holiday-meta">${range}${item.reason ? ` · ${item.reason}` : ""}</div>
         <div class="holiday-status status-${item.status?.toLowerCase() || "approved"}">${item.status || "Approved"}</div>
@@ -33,26 +33,26 @@ function createTimeOffTemplate() {
 
   return `<section class="card holidays-card">
     <div class="card-title-row">
-      <h2>Time off requests</h2>
+      <h2>Leave requests</h2>
       <div class="admin-inline-actions">
-        ${!isAdmin ? `<button class="btn btn-primary" type="button" id="add-leave">New Time Off Request</button>` : ""}
+        ${!isAdmin ? `<button class="btn btn-primary" type="button" id="add-leave">New Leave Request</button>` : ""}
         <button class="btn btn-ghost" type="button" id="refresh-leaves">↻ Refresh</button>
       </div>
     </div>
-    <div class="holiday-list">${leaveRows || '<p class="empty-note">No time off requests yet.</p>'}</div>
+    <div class="holiday-list">${leaveRows || '<p class="empty-note">No leave requests yet.</p>'}</div>
   </section>
   ${createLeaveModalHtml()}`;
 }
 
 function renderTimeOff() {
   loadLeaves().then(() => {
-    root.innerHTML = createPageShell("Time Off", createTimeOffTemplate());
+    root.innerHTML = createPageShell("Leave Requests", createTimeOffTemplate());
     attachDashboardListeners();
     attachLeaveModalListeners();
     updateDashboardValues();
   }).catch(() => {
     state.leaveData = [];
-    root.innerHTML = createPageShell("Time Off", createTimeOffTemplate());
+    root.innerHTML = createPageShell("Leave Requests", createTimeOffTemplate());
     attachDashboardListeners();
     attachLeaveModalListeners();
     updateDashboardValues();

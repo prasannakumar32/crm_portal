@@ -44,6 +44,11 @@ function setError(message) {
 
 function setPage(page, updateHash = true) {
   state.page = page;
+  if (page === "login") {
+    localStorage.removeItem("crm-current-page");
+  } else {
+    localStorage.setItem("crm-current-page", page);
+  }
   if (updateHash) {
     location.hash = `#${page}`;
   }
@@ -132,7 +137,7 @@ function createPageShell(title, contentHtml) {
       <nav class="nav-list">
         <div class="nav-title${state.page === "dashboard" ? " active" : ""}" data-page="dashboard"><span>Dashboard</span></div>
         <div class="nav-title${state.page === "timesheets" ? " active" : ""}" data-page="timesheets"><span>Timesheets</span></div>
-        <div class="nav-title${state.page === "timeoff" ? " active" : ""}" data-page="timeoff"><span>Time Off</span></div>
+        <div class="nav-title${state.page === "timeoff" ? " active" : ""}" data-page="timeoff"><span>Leave Requests</span></div>
         <div class="nav-title${state.page === "holidays" ? " active" : ""}" data-page="holidays"><span>Upcoming Holidays</span></div>
         <div class="nav-title${state.page === "tasks" ? " active" : ""}" data-page="tasks"><span>Tasks</span></div>
         <div class="nav-section-title">Settings</div>
@@ -227,7 +232,7 @@ function createDashboardTemplate() {
     const start = new Date(item.startDate);
     const month = start.toLocaleString("en", { month: "short" }).toUpperCase();
     const day = String(start.getDate()).padStart(2, "0");
-    const title = item.name || "Time off";
+    const title = item.name || "Leave request";
     const category = item.type || "Leave";
     const end = item.endDate ? new Date(item.endDate) : start;
     const range = item.endDate ? `${formatDate(item.startDate, getUserTimeZone())} – ${formatDate(item.endDate, getUserTimeZone())}` : formatDate(item.startDate, getUserTimeZone());
@@ -247,23 +252,50 @@ function createDashboardTemplate() {
     </div>`;
   }).join("");
 
-  const upcomingHolidays = (state.leaveData || []).filter((item) => String(item.type || "").toLowerCase() === "holiday");
-  const timeOffItems = (state.leaveData || []).filter((item) => String(item.type || "").toLowerCase() !== "holiday");
-  const holidayLimit = state.dashboardLeaveLimits?.holidays || 3;
-  const timeOffLimit = state.dashboardLeaveLimits?.timeOff || 3;
-  const createLeaveCard = (title, items, limit, key, emptyText) => {
-    const visibleItems = items.slice(0, limit);
-    const remaining = Math.max(0, items.length - limit);
+  const renderPublicHolidayRows = (items) => items.map((item) => {
+    const date = new Date(`${item.date}T00:00:00Z`);
+    const month = new Intl.DateTimeFormat("en", { month: "short", timeZone: "UTC" }).format(date).toUpperCase();
+    const day = new Intl.DateTimeFormat("en", { day: "2-digit", timeZone: "UTC" }).format(date);
+    const label = item.localName || item.name || "Public holiday";
+    const dateLabel = new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(date);
+    return `<div class="holiday-row">
+      <span class="holiday-date">${month}<br/>${day}</span>
+      <div>
+        <div class="holiday-name">${label}</div>
+        <div class="holiday-place">Public holiday · ${item.country || state.holidayCountry}</div>
+        <div class="holiday-meta">${dateLabel}</div>
+        <div class="holiday-status status-approved">Public holiday</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  const publicHolidays = (state.holidayData || [])
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+  const createdHolidays = (state.leaveData || [])
+    .filter((item) => String(item.type || "").toLowerCase() === "holiday")
+    .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+  const upcomingHolidayItems = [...publicHolidays, ...createdHolidays].sort(
+    (a, b) => new Date(a.date || a.startDate) - new Date(b.date || b.startDate)
+  );
+  const timeOffItems = (state.leaveData || [])
+    .filter((item) => String(item.type || "").toLowerCase() !== "holiday")
+    .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+  const createLeaveCard = (title, items, key, emptyText, rowRenderer = renderLeaveRows) => {
     return `<aside class="card holidays-card leave-summary-card">
       <div class="card-title-row">
         <div>
           <h2>${title}</h2>
           <span class="card-subtitle">${items.length ? `${items.length} scheduled` : "Keep your calendar up to date"}</span>
         </div>
-        ${key === "timeOff" && state.user?.role === "admin" ? `<button class="btn btn-primary" type="button" id="add-leave-dashboard">Add Time Off</button>` : ""}
+        ${state.user?.role === "admin" && key === "holidays" ? `<button class="btn btn-primary" type="button" id="add-holiday-dashboard">Add Holiday</button>` : ""}
+        ${state.user?.role === "admin" && key === "timeOff" ? `<button class="btn btn-primary" type="button" id="add-leave-dashboard">Add Leave Request</button>` : ""}
       </div>
-      <div class="holiday-list">${renderLeaveRows(visibleItems) || `<p class="empty-note">${emptyText}</p>`}</div>
-      ${remaining ? `<button class="load-more-leaves" type="button" data-load-leaves="${key}">Load more <span>(${Math.min(3, remaining)})</span></button>` : ""}
+      <div class="holiday-list">${rowRenderer(items) || `<p class="empty-note">${emptyText}</p>`}</div>
     </aside>`;
   };
 
@@ -280,8 +312,8 @@ function createDashboardTemplate() {
             <div class="profile-details-row"><span class="small-label">Location</span><span class="value-text">${dbLocation}</span></div>
             <div class="profile-details-row"><span class="small-label">Timezone</span><span class="value-text">${dbTimezone}</span></div>
           </section>
-          ${createLeaveCard("Upcoming Holidays", upcomingHolidays, holidayLimit, "holidays", "No upcoming holidays scheduled.")}
-          ${createLeaveCard("Time Off", timeOffItems, timeOffLimit, "timeOff", "No time off scheduled.")}
+          ${createLeaveCard("Upcoming Holidays", upcomingHolidayItems, "holidays", "No upcoming holidays scheduled.", (items) => items.map((item) => item.startDate ? renderLeaveRows([item]) : renderPublicHolidayRows([item])).join(""))}
+          ${createLeaveCard("Leave Requests", timeOffItems, "timeOff", "No leave requests scheduled.")}
           ${createLeaveModalHtml()}
         </div>
         <section class="card tracked-card">
@@ -478,49 +510,6 @@ function renderDashboard() {
   });
 }
 
-function createLeaveModalHtml() {
-  const isAdmin = state.user?.role === "admin";
-  const dbLocation = state.user?.location || "Australia";
-  return `
-        <div class="task-modal-overlay" id="leave-modal" style="display:none;">
-          <div class="task-modal-card">
-            <div class="task-modal-header">
-              <h3 id="leave-modal-title">New Time Off Request</h3>
-              <button class="icon-button" id="close-leave-modal" type="button">×</button>
-            </div>
-            <form id="leave-form">
-              <input type="hidden" id="leave-id" />
-              <div class="form-section">
-                <h4 class="form-section-title">Leave Details</h4>
-                <div class="form-grid">
-                  <label class="field-block full-width"><span>Leave Name <span class="required-indicator">*</span></span><input id="leave-name" required placeholder="Enter leave name" /></label>
-                  <label class="field-block"><span>Type</span><select id="leave-type"><option value="Holiday">Holiday</option><option value="Annual Leave">Annual Leave</option><option value="Sick Leave">Sick Leave</option><option value="Personal Leave">Personal Leave</option></select></label>
-                  <label class="field-block"><span>Location</span><input id="leave-location" value="${dbLocation}" required /></label>
-                </div>
-              </div>
-              <div class="form-section">
-                <h4 class="form-section-title">Date & Status</h4>
-                <div class="form-grid">
-                  <label class="field-block"><span>Start Date <span class="required-indicator">*</span></span><div class="date-time-control"><input id="leave-date" type="date" required /></div></label>
-                  <label class="field-block"><span>End Date <span class="required-indicator">*</span></span><div class="date-time-control"><input id="leave-end-date" type="date" required /></div></label>
-                  <label class="field-block full-width"><span>Reason <span class="required-indicator">*</span></span><input id="leave-reason" required placeholder="Enter reason for leave" /></label>
-                  ${isAdmin ? `
-                  <label class="field-block"><span>Status</span><select id="leave-status"><option value="Approved">Approved</option><option value="Pending">Pending</option><option value="Requested">Requested</option><option value="Rejected">Rejected</option></select></label>
-                  ` : `<input type="hidden" id="leave-status" value="Requested" />`}
-                </div>
-              </div>
-              <div class="form-section">
-                <div class="form-grid form-actions-grid">
-                  <button class="btn btn-ghost" type="button" id="cancel-leave">Cancel</button>
-                  <button class="btn btn-primary" type="submit" id="submit-leave">Submit Request</button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      `;
-}
-
 // Home page removed — login is now the default landing page.
 
 function renderLogin() {
@@ -591,46 +580,6 @@ function renderLogin() {
       }
     });
   }
-}
-
-function createBreakReasonModalHtml() {
-  return `
-    <div class="task-modal-overlay" id="break-reason-modal" style="display:none;">
-      <div class="task-modal-card break-reason-card">
-        <div class="task-modal-header">
-          <h3>Why are you taking a break?</h3>
-          <button class="icon-button" id="close-break-reason-modal" type="button" aria-label="Close break reason dialog">×</button>
-        </div>
-        <div class="break-allowance-info" id="break-allowance-modal-info">
-          You have 60 minutes of break time remaining today (allowance: 60 min).
-        </div>
-        <form id="break-reason-form">
-          <div class="break-reason-options">
-            <label class="break-reason-option">
-              <input type="radio" name="breakReason" value="Breakfast" checked>
-              <span>Breakfast</span>
-            </label>
-            <label class="break-reason-option">
-              <input type="radio" name="breakReason" value="Lunch">
-              <span>Lunch</span>
-            </label>
-            <label class="break-reason-option">
-              <input type="radio" name="breakReason" value="Other">
-              <span>Other</span>
-            </label>
-          </div>
-          <label class="field-block break-reason-custom" id="break-reason-custom-wrap" style="display:none;">
-            <span>Other reason</span>
-            <input id="break-reason-other" type="text" maxlength="200" placeholder="Please specify your reason" />
-          </label>
-          <div class="modal-actions">
-            <button class="btn btn-ghost" type="button" id="cancel-break-reason">Cancel</button>
-            <button class="btn btn-primary" type="submit">Start break</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  `;
 }
 
 function openBreakReasonModal() {
@@ -922,7 +871,7 @@ function attachDashboardListeners() {
     });
   }
 
-  // Dashboard holiday row actions - redirect to Time Off page for editing
+  // Dashboard leave row actions - redirect to Leave Requests for editing
   const dashboardHolidayRows = document.querySelectorAll("[data-action='edit-leave']");
   for (const btn of dashboardHolidayRows) {
     btn.addEventListener("click", () => {
@@ -934,7 +883,7 @@ function attachDashboardListeners() {
   for (const btn of deleteHolidayRows) {
     btn.addEventListener("click", async () => {
       const target = btn.dataset.id;
-      if (!confirm("Are you sure you want to delete this time off entry?")) {
+      if (!confirm("Are you sure you want to delete this leave request?")) {
         return;
       }
       try {
@@ -955,6 +904,13 @@ function attachDashboardListeners() {
   if (addLeaveDashboard) {
     addLeaveDashboard.addEventListener("click", () => {
       openLeaveModal(null);
+    });
+  }
+
+  const addHolidayDashboard = document.getElementById("add-holiday-dashboard");
+  if (addHolidayDashboard) {
+    addHolidayDashboard.addEventListener("click", () => {
+      openLeaveModal(null, true);
     });
   }
 
@@ -1034,15 +990,6 @@ function attachDashboardListeners() {
     }
   }
 
-  const loadMoreLeaveButtons = document.querySelectorAll("[data-load-leaves]");
-  for (const button of loadMoreLeaveButtons) {
-    button.addEventListener("click", () => {
-      const key = button.dataset.loadLeaves;
-      if (!key) return;
-      state.dashboardLeaveLimits[key] = (state.dashboardLeaveLimits[key] || 3) + 3;
-      renderDashboard();
-    });
-  }
 }
 
 function updateDashboardValues() {
@@ -1240,7 +1187,7 @@ function setFlapText(container, text) {
   }
 }
 
-function openLeaveModal(leaveId) {
+function openLeaveModal(leaveId, holidayMode = false) {
   const modal = document.getElementById("leave-modal");
   const modalTitle = document.getElementById("leave-modal-title");
   if (!modal) return;
@@ -1256,10 +1203,19 @@ function openLeaveModal(leaveId) {
   const reasonInput = document.getElementById("leave-reason");
   const statusInput = document.getElementById("leave-status");
 
-  if (modalTitle) modalTitle.textContent = leave ? (isAdmin ? "Edit Time Off" : "View/Edit Request") : "New Time Off Request";
+  if (modalTitle) modalTitle.textContent = holidayMode ? "New Upcoming Holiday" : leave ? (isAdmin ? "Edit Leave Request" : "View/Edit Leave Request") : "New Leave Request";
   if (idInput) idInput.value = leave ? String(leave.id) : "";
   if (nameInput) nameInput.value = leave?.name || "";
-  if (typeInput) typeInput.value = leave?.type || "Annual Leave";
+  if (typeInput) {
+    typeInput.value = holidayMode ? "Holiday" : leave?.type || "Annual Leave";
+    typeInput.disabled = holidayMode;
+  }
+  const nameLabel = document.getElementById("leave-name-label");
+  const reasonLabel = document.getElementById("leave-reason-label");
+  const submitButton = document.getElementById("submit-leave");
+  if (nameLabel) nameLabel.childNodes[0].textContent = holidayMode ? "Holiday Name " : "Leave Name ";
+  if (reasonLabel) reasonLabel.childNodes[0].textContent = holidayMode ? "Description " : "Reason ";
+  if (submitButton) submitButton.textContent = holidayMode ? "Create Holiday" : "Submit Request";
   if (locationInput) locationInput.value = leave?.location || state.user?.location || "Australia";
   if (dateInput) dateInput.value = leave?.startDate || new Date().toISOString().slice(0, 10);
   if (endDateInput) endDateInput.value = leave?.endDate || leave?.startDate || new Date().toISOString().slice(0, 10);
