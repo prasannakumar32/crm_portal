@@ -155,7 +155,7 @@ function createPageShell(title, contentHtml) {
         <div class="nav-section-title">Settings</div>
         <div class="nav-title${state.page === "work-schedules" ? " active" : ""}" data-page="work-schedules"><span>Work Schedules</span></div>
         ${isAdmin ? `<div class="nav-section-title">Admin</div>
-        <div class="nav-title${state.page === "user-management" ? " active" : ""}" data-page="user-management"><span>User Management</span></div>` : ""}
+        <div class="nav-title${state.page === "user-management" ? " active" : ""}" data-page="user-management"><span>Employee Management</span></div>` : ""}
       </nav>
       <div class="profile-mini">
         <div class="profile-dot"></div>
@@ -551,8 +551,8 @@ function createLeaveModalHtml() {
               <div class="form-section">
                 <h4 class="form-section-title">Date & Status</h4>
                 <div class="form-grid">
-                  <label class="field-block"><span>Start Date <span class="required-indicator">*</span></span><input id="leave-date" type="date" required /></label>
-                  <label class="field-block"><span>End Date <span class="required-indicator">*</span></span><input id="leave-end-date" type="date" required /></label>
+                  <label class="field-block"><span>Start Date <span class="required-indicator">*</span></span><div class="date-time-control"><input id="leave-date" type="date" required /></div></label>
+                  <label class="field-block"><span>End Date <span class="required-indicator">*</span></span><div class="date-time-control"><input id="leave-end-date" type="date" required /></div></label>
                   <label class="field-block full-width"><span>Reason <span class="required-indicator">*</span></span><input id="leave-reason" required placeholder="Enter reason for leave" /></label>
                   ${isAdmin ? `
                   <label class="field-block"><span>Status</span><select id="leave-status"><option value="Approved">Approved</option><option value="Pending">Pending</option><option value="Requested">Requested</option><option value="Rejected">Rejected</option></select></label>
@@ -820,16 +820,20 @@ function createWorkSchedulesTemplate() {
   const rows = (state.scheduleData || []).map((item) => `
     <div class="schedule-row">
       <div class="schedule-item schedule-date">
-        <strong>${item.date}</strong>
-        <span>${item.shift}</span>
+        <strong>${item.name || "Unnamed schedule"}</strong>
+        <span>${item.date} · ${item.shift}</span>
       </div>
       <div class="schedule-item schedule-time">
         <strong>${item.start} - ${item.end}</strong>
         <span>${item.location}</span>
       </div>
       <div class="schedule-item schedule-owner">
-        <strong>${item.owner}</strong>
+        <strong>${item.assigned}</strong>
         <span>${item.status}</span>
+      </div>
+      <div class="schedule-item schedule-actions">
+        <button class="mini-action" type="button" data-action="edit-schedule" data-id="${item.id}">Edit</button>
+        <button class="mini-action danger" type="button" data-action="delete-schedule" data-id="${item.id}">Delete</button>
       </div>
     </div>
   `).join("");
@@ -844,9 +848,10 @@ function createWorkSchedulesTemplate() {
         <button class="btn btn-primary" type="button" id="new-schedule">New schedule</button>
       </div>
       <div class="schedule-header-row">
-        <span>Date & shift</span>
+        <span>Name & date</span>
         <span>Time & location</span>
-        <span>Owner & status</span>
+        <span>Assigned & status</span>
+        <span>Actions</span>
       </div>
       <div class="schedule-list">
         ${rows}
@@ -870,17 +875,18 @@ function createScheduleModalHtml() {
           <div class="form-section">
             <h4 class="form-section-title">Schedule Details</h4>
             <div class="form-grid">
-              <label class="field-block"><span>Date <span class="required-indicator">*</span></span><input type="date" id="schedule-date" required /></label>
+              <label class="field-block full-width"><span>Name <span class="required-indicator">*</span></span><input id="schedule-name" required placeholder="Enter schedule name" /></label>
+              <label class="field-block"><span>Date <span class="required-indicator">*</span></span><div class="date-time-control"><input type="date" id="schedule-date" required /></div></label>
               <label class="field-block"><span>Shift</span><select id="schedule-shift"><option value="Morning">Morning</option><option value="Afternoon">Afternoon</option><option value="Night">Night</option></select></label>
-              <label class="field-block"><span>Start Time <span class="required-indicator">*</span></span><input type="time" id="schedule-start" required /></label>
-              <label class="field-block"><span>End Time <span class="required-indicator">*</span></span><input type="time" id="schedule-end" required /></label>
+              <label class="field-block"><span>Start Time <span class="required-indicator">*</span></span><div class="date-time-control time-control"><input type="time" id="schedule-start" required /></div></label>
+              <label class="field-block"><span>End Time <span class="required-indicator">*</span></span><div class="date-time-control time-control"><input type="time" id="schedule-end" required /></div></label>
             </div>
           </div>
           <div class="form-section">
             <h4 class="form-section-title">Assignment & Status</h4>
             <div class="form-grid">
               <label class="field-block"><span>Location <span class="required-indicator">*</span></span><input id="schedule-location" required placeholder="Enter location" /></label>
-              <label class="field-block"><span>Owner <span class="required-indicator">*</span></span><input id="schedule-owner" required placeholder="Enter owner name" /></label>
+              <label class="field-block"><span>Assigned <span class="required-indicator">*</span></span><input id="schedule-assigned" required placeholder="Enter assignee name" /></label>
               <label class="field-block"><span>Status</span><select id="schedule-status"><option value="Confirmed">Confirmed</option><option value="Planned">Planned</option><option value="Pending">Pending</option><option value="Blocked">Blocked</option></select></label>
             </div>
           </div>
@@ -902,20 +908,28 @@ function openScheduleModal(schedule = null) {
   const shiftInput = document.getElementById("schedule-shift");
   const startInput = document.getElementById("schedule-start");
   const endInput = document.getElementById("schedule-end");
+  const nameInput = document.getElementById("schedule-name");
   const locationInput = document.getElementById("schedule-location");
-  const ownerInput = document.getElementById("schedule-owner");
+  const assignedInput = document.getElementById("schedule-assigned");
   const statusInput = document.getElementById("schedule-status");
 
-  if (!modal || !titleEl || !formId || !dateInput || !shiftInput || !startInput || !endInput || !locationInput || !ownerInput || !statusInput) return;
+  if (!modal || !titleEl || !formId || !dateInput || !shiftInput || !startInput || !endInput || !nameInput || !locationInput || !assignedInput || !statusInput) return;
 
   titleEl.textContent = schedule ? "Edit Work Schedule" : "New Work Schedule";
   formId.value = schedule?.id || "";
-  dateInput.value = schedule?.date || "";
+  const now = new Date();
+  const localDate = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
+  const localTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const endTimeDate = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  const defaultEndTime = `${String(endTimeDate.getHours()).padStart(2, "0")}:${String(endTimeDate.getMinutes()).padStart(2, "0")}`;
+
+  dateInput.value = schedule?.date || localDate;
   shiftInput.value = schedule?.shift || "Morning";
-  startInput.value = schedule?.start || "";
-  endInput.value = schedule?.end || "";
+  startInput.value = schedule?.start || localTime;
+  endInput.value = schedule?.end || defaultEndTime;
+  nameInput.value = schedule?.name || "";
   locationInput.value = schedule?.location || "";
-  ownerInput.value = schedule?.owner || "";
+  assignedInput.value = schedule?.assigned || schedule?.owner || "";
   statusInput.value = schedule?.status || "Confirmed";
 
   modal.style.display = "flex";
@@ -1140,23 +1154,41 @@ function attachDashboardListeners() {
       const scheduleId = Number(document.getElementById("schedule-id").value || Date.now());
       const nextRecord = {
         id: scheduleId || Date.now(),
+        name: document.getElementById("schedule-name").value.trim(),
         date: document.getElementById("schedule-date").value,
         shift: document.getElementById("schedule-shift").value || "Morning",
         start: document.getElementById("schedule-start").value,
         end: document.getElementById("schedule-end").value,
         location: document.getElementById("schedule-location").value.trim() || state.user?.location || "Australia",
-        owner: document.getElementById("schedule-owner").value.trim() || state.user?.fullName || "Team",
+        assigned: document.getElementById("schedule-assigned").value.trim() || state.user?.fullName || "Team",
         status: document.getElementById("schedule-status").value || "Confirmed",
       };
-      if (!nextRecord.date || !nextRecord.start || !nextRecord.end || !nextRecord.location || !nextRecord.owner) return;
+      if (!nextRecord.name || !nextRecord.date || !nextRecord.start || !nextRecord.end || !nextRecord.location || !nextRecord.assigned) return;
       const existing = state.scheduleData.find((row) => row.id === nextRecord.id);
       if (existing) {
         Object.assign(existing, nextRecord);
       } else {
         state.scheduleData.push(nextRecord);
       }
+      saveSchedules();
       closeScheduleModal();
       if (state.page === "work-schedules") renderWorkSchedules();
+    });
+  }
+
+  const scheduleActions = document.querySelectorAll("[data-action='edit-schedule'], [data-action='delete-schedule']");
+  for (const button of scheduleActions) {
+    button.addEventListener("click", () => {
+      const scheduleId = Number(button.dataset.id);
+      const schedule = state.scheduleData.find((row) => row.id === scheduleId);
+      if (!schedule) return;
+      if (button.dataset.action === "edit-schedule") {
+        openScheduleModal(schedule);
+        return;
+      }
+      state.scheduleData = state.scheduleData.filter((row) => row.id !== scheduleId);
+      saveSchedules();
+      renderWorkSchedules();
     });
   }
 
@@ -1613,7 +1645,7 @@ function createUserManagementTemplate() {
     <tr>
       <td>${user.fullName || "—"}</td>
       <td>${user.username || "—"}</td>
-      <td><span class="badge role-badge role-${user.role || "user"}">${user.role || "user"}</span></td>
+      <td><span class="badge role-badge role-${user.role || "employee"}">${user.role || "employee"}</span></td>
       <td>${user.location || "—"}</td>
       <td>${user.timezone || "—"}</td>
       <td>${user.dailyBreakAllowanceMinutes || 60} min</td>
@@ -1625,9 +1657,9 @@ function createUserManagementTemplate() {
 
   return `<section class="card users-card">
           <div class="card-title-row">
-            <h2>User Management</h2>
+            <h2>Employee Management</h2>
             <div class="admin-inline-actions">
-              <button class="btn btn-primary" type="button" id="add-user">Create New User</button>
+              <button class="btn btn-primary" type="button" id="add-user">Create New Employee</button>
               <button class="btn btn-ghost" type="button" id="refresh-users">↻ Refresh</button>
             </div>
           </div>
@@ -1644,19 +1676,19 @@ function createUserManagementTemplate() {
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody id="users-body">${userRows || '<tr><td colspan="7" class="empty-note">No users found. Create the first user to get started.</td></tr>'}</tbody>
+              <tbody id="users-body">${userRows || '<tr><td colspan="7" class="empty-note">No employees found. Create the first employee to get started.</td></tr>'}</tbody>
             </table>
           </div>
         </section>
         <div class="task-modal-overlay" id="user-modal" style="display:none;">
           <div class="task-modal-card">
             <div class="task-modal-header">
-              <h3 id="user-modal-title">Create New User</h3>
+              <h3 id="user-modal-title">Create New Employee</h3>
               <button class="icon-button" id="close-user-modal" type="button">×</button>
             </div>
             <form id="user-form">
               <div class="form-section">
-                <h4 class="form-section-title">User Information</h4>
+                <h4 class="form-section-title">Employee Information</h4>
                 <div class="form-grid">
                   <label class="field-block full-width"><span>Full Name <span class="required-indicator">*</span></span><input id="user-fullname" required placeholder="Enter full name" /></label>
                   <label class="field-block"><span>Username <span class="required-indicator">*</span></span><input id="user-username" required placeholder="Enter username (3-32 characters)" /></label>
@@ -1666,7 +1698,7 @@ function createUserManagementTemplate() {
               <div class="form-section">
                 <h4 class="form-section-title">Role & Location</h4>
                 <div class="form-grid">
-                  <label class="field-block"><span>Role</span><select id="user-role"><option value="user">User</option><option value="admin">Admin</option></select></label>
+                  <label class="field-block"><span>Role</span><select id="user-role"><option value="employee">Employee</option><option value="admin">Admin</option></select></label>
                   <label class="field-block"><span>Location</span><input id="user-location" placeholder="e.g., Australia, India" /></label>
                   <label class="field-block"><span>Timezone</span><select id="user-timezone">
                     <option value="">Select timezone</option>
@@ -1685,7 +1717,7 @@ function createUserManagementTemplate() {
               <div class="form-section">
                 <div class="form-grid form-actions-grid">
                   <button class="btn btn-ghost" type="button" id="cancel-user">Cancel</button>
-                  <button class="btn btn-primary" type="submit" id="submit-user">Create User</button>
+                  <button class="btn btn-primary" type="submit" id="submit-user">Create Employee</button>
                 </div>
               </div>
             </form>
@@ -1719,12 +1751,12 @@ function createUserManagementTemplate() {
 
 function renderUserManagement() {
   loadUsers().then(() => {
-    root.innerHTML = createPageShell("User Management", createUserManagementTemplate());
+    root.innerHTML = createPageShell("Employee Management", createUserManagementTemplate());
     attachDashboardListeners();
     updateUserManagementListeners();
   }).catch(() => {
     state.users = [];
-    root.innerHTML = createPageShell("User Management", createUserManagementTemplate());
+    root.innerHTML = createPageShell("Employee Management", createUserManagementTemplate());
     attachDashboardListeners();
     updateUserManagementListeners();
   });
@@ -1763,7 +1795,7 @@ function updateUserManagementListeners() {
       const dailyBreakAllowanceMinutes = parseInt(document.getElementById("break-allowance-minutes").value) || 60;
 
       if (!userId) {
-        alert("User ID is required.");
+        alert("Employee ID is required.");
         return;
       }
 
@@ -1822,7 +1854,7 @@ function updateUserManagementListeners() {
         if (state.page === "user-management") renderUserManagement();
       } catch (error) {
         console.error("Failed to create user:", error);
-        alert(error.error || "Failed to create user. Please try again.");
+        alert(error.error || "Failed to create employee. Please try again.");
       }
     });
   }
@@ -1860,7 +1892,7 @@ function openUserModal() {
   if (fullnameInput) fullnameInput.value = "";
   if (usernameInput) usernameInput.value = "";
   if (passwordInput) passwordInput.value = "";
-  if (roleInput) roleInput.value = "user";
+  if (roleInput) roleInput.value = "employee";
   if (locationInput) locationInput.value = state.user?.location || "";
   if (timezoneInput) timezoneInput.value = state.user?.timezone || "";
   if (breakAllowanceInput) breakAllowanceInput.value = "60";

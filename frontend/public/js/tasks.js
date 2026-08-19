@@ -159,7 +159,7 @@ function createTaskModalHtml(projects, users) {
               <label class="field-block"><span>Assignee</span><select id="task-assignee">${[`<option value="">Unassigned</option>`, ...users.map((user) => `<option value="${user.id}">${user.fullName}</option>`)].join("")}</select></label>
               <label class="field-block"><span>Status</span><select id="task-status">${TASK_STATUS_OPTIONS.map((status) => `<option value="${status}">${status}</option>`).join("")}</select></label>
               <label class="field-block"><span>Priority</span><select id="task-priority">${TASK_PRIORITY_OPTIONS.map((priority) => `<option value="${priority}">${priority}</option>`).join("")}</select></label>
-              <label class="field-block"><span>Due Date</span><input type="date" id="task-due-date" /></label>
+              <label class="field-block"><span>Due Date</span><div class="date-time-control"><input type="date" id="task-due-date" /></div></label>
             </div>
           </div>
           <div class="modal-actions">

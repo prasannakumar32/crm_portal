@@ -6,7 +6,7 @@ const { ObjectId } = require("mongodb");
 async function getUsers() {
   const db = await getDb();
   const users = await db.collection("users").find({}).toArray();
-  return users.map((u) => ({ ...u, id: u._id.toString() }));
+  return users.map((u) => ({ ...u, role: u.role === "user" ? "employee" : u.role, id: u._id.toString() }));
 }
 
 async function findUserByUsername(username) {
@@ -14,7 +14,7 @@ async function findUserByUsername(username) {
   const needle = username.trim().toLowerCase();
   const user = await db.collection("users").findOne({ normalizedUsername: needle });
   if (!user) return null;
-  return { ...user, id: user._id.toString() };
+  return { ...user, role: user.role === "user" ? "employee" : user.role, id: user._id.toString() };
 }
 
 async function findUserById(id) {
@@ -23,13 +23,13 @@ async function findUserById(id) {
   try {
     const user = await db.collection("users").findOne({ _id: new ObjectId(id) });
     if (!user) return null;
-    return { ...user, id: user._id.toString() };
+    return { ...user, role: user.role === "user" ? "employee" : user.role, id: user._id.toString() };
   } catch (err) {
     return null;
   }
 }
 
-async function createUser({ username, passwordHash, fullName, role = "user", location = null, timezone = null, dailyBreakAllowanceMinutes = 60 }) {
+async function createUser({ username, passwordHash, fullName, role = "employee", location = null, timezone = null, dailyBreakAllowanceMinutes = 60 }) {
   const db = await getDb();
   const normalizedUsername = username.trim().toLowerCase();
   const doc = {

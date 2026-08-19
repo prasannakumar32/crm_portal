@@ -43,6 +43,29 @@ const API_BASE_URL = window.location.hostname === 'localhost' || window.location
   ? "http://localhost:3333"
   : (window.location.origin || "");
 
+const SCHEDULE_STORAGE_KEY = "crm-portal-work-schedules";
+
+function loadStoredSchedules() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(SCHEDULE_STORAGE_KEY) || "null");
+    return Array.isArray(stored) ? stored.map((schedule) => ({
+      ...schedule,
+      name: schedule.name || "Unnamed schedule",
+      assigned: schedule.assigned || schedule.owner || "Unassigned",
+    })) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSchedules() {
+  try {
+    localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(state.scheduleData));
+  } catch {
+    // Keep schedule changes available for the current session if storage is unavailable.
+  }
+}
+
 const state = {
   page: location.hash.slice(1) || "home",
   user: null,
@@ -61,10 +84,10 @@ const state = {
   taskFilter: { status: null, projectId: null, assigneeId: null },
   taskView: "board",
   currentTask: null,
-  scheduleData: [
-    { id: 1, date: "2026-08-11", shift: "Morning", start: "09:00", end: "17:00", location: "Sydney Office", owner: "Muthu", status: "Confirmed" },
-    { id: 2, date: "2026-08-12", shift: "Afternoon", start: "13:00", end: "21:00", location: "Kolkata Remote", owner: "Priya", status: "Planned" },
-    { id: 3, date: "2026-08-13", shift: "Morning", start: "08:00", end: "16:00", location: "Sydney Office", owner: "Rohan", status: "Confirmed" },
+  scheduleData: loadStoredSchedules() || [
+    { id: 1, name: "Sydney morning shift", date: "2026-08-11", shift: "Morning", start: "09:00", end: "17:00", location: "Sydney Office", assigned: "Muthu", status: "Confirmed" },
+    { id: 2, name: "Kolkata afternoon shift", date: "2026-08-12", shift: "Afternoon", start: "13:00", end: "21:00", location: "Kolkata Remote", assigned: "Priya", status: "Planned" },
+    { id: 3, name: "Sydney early shift", date: "2026-08-13", shift: "Morning", start: "08:00", end: "16:00", location: "Sydney Office", assigned: "Rohan", status: "Confirmed" },
   ],
   leaveData: [],
   locationLabel: "Locating…",

@@ -31,7 +31,7 @@ async function canCreateUsers(req, res, next) {
 
 router.post("/create-user", canCreateUsers, async (req, res) => {
   try {
-    const { username, password, fullName, role = "user", location, timezone, dailyBreakAllowanceMinutes } = req.body || {};
+    const { username, password, fullName, role = "employee", location, timezone, dailyBreakAllowanceMinutes } = req.body || {};
 
     if (!username || !password || !fullName) {
       return res.status(400).json({ error: "Full name, username and password are all required." });
@@ -51,8 +51,8 @@ router.post("/create-user", canCreateUsers, async (req, res) => {
 
     const users = await db.getUsers();
     const selectedRole = users.length === 0 ? "admin" : role;
-    if (!["user", "admin"].includes(selectedRole)) {
-      return res.status(400).json({ error: "Role must be user or admin." });
+    if (!["employee", "admin"].includes(selectedRole)) {
+      return res.status(400).json({ error: "Role must be employee or admin." });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);

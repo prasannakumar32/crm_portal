@@ -24,7 +24,7 @@ async function migrate() {
       normalizedUsername: u.username.trim().toLowerCase(),
       passwordHash: u.passwordHash,
       fullName: u.fullName,
-      role: u.role || 'user',
+      role: u.role === 'user' ? 'employee' : (u.role || 'employee'),
       createdAt: u.createdAt || new Date().toISOString()
     }));
     await usersCol.insertMany(docs);
