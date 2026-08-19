@@ -89,8 +89,8 @@ crm-portal/
 │       ├── users.json        (Local development - can be ignored with MongoDB)
 │       └── attendance.json   (Local development - can be ignored with MongoDB)
 ├── frontend/
+│   ├── app-shell.js         Server-rendered browser entry shell
 │   ├── public/
-│   │   ├── index.html
 │   │   ├── css/style.css
 │   │   ├── js/
 │   │   │   ├── app.js

@@ -10,6 +10,7 @@ const authRoutes = require("./src/auth");
 const attendanceRoutes = require("./src/attendance");
 const taskRoutes = require("./src/tasks");
 const holidayRoutes = require("./src/holidays");
+const { renderAppShell } = require("../frontend/app-shell");
 const { requireAuth } = require("./src/middleware");
 const { connect: connectMongo } = require("./src/mongo");
 
@@ -81,11 +82,11 @@ const publicPath = path.join(__dirname, "..", "frontend", "public");
 
 app.use(express.static(publicPath));
 
-app.get("/", (req, res) => res.sendFile(path.join(publicPath, "index.html")));
+app.get("/", (req, res) => res.type("html").send(renderAppShell()));
 
 app.use((req, res) => {
   if (req.path.startsWith("/api/")) return res.status(404).json({ error: "Not found." });
-  res.sendFile(path.join(publicPath, "index.html"));
+  res.type("html").send(renderAppShell());
 });
 
 async function startServer() {
