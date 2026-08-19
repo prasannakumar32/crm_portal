@@ -29,7 +29,7 @@ function createTasksTemplate() {
   const statuses = state.taskStatuses || TASK_STATUS_OPTIONS;
   const projects = state.projects || [];
   const users = state.teamUsers || [];
-  const projectOptions = [`<option value="">All projects</option>`, ...projects.map((project) => `<option value="${project.id}">${project.name}</option>`)];
+  const projectOptions = [`<option value="">All projects</option>`, ...projects.map((project) => `<option value="${project.id}">${project.name} (${project.clientName || 'No Client'})</option>`)];
   const assigneeOptions = [`<option value="">Unassigned</option>`, ...users.map((user) => `<option value="${user.id}">${user.fullName}</option>`)].join("");
 
   return createPageShell("Tasks & Tickets", `
@@ -155,7 +155,7 @@ function createTaskModalHtml(projects, users) {
           <div class="form-section">
             <h4 class="form-section-title">Assignment & Status</h4>
             <div class="form-grid">
-              <label class="field-block"><span>Project</span><select id="task-project"><option value="">General</option>${projects.map((project) => `<option value="${project.id}">${project.name}</option>`).join("")}</select></label>
+              <label class="field-block"><span>Project</span><select id="task-project"><option value="">General</option>${projects.map((project) => `<option value="${project.id}">${project.name} (${project.clientName || 'No Client'})</option>`).join("")}</select></label>
               <label class="field-block"><span>Assignee</span><select id="task-assignee">${[`<option value="">Unassigned</option>`, ...users.map((user) => `<option value="${user.id}">${user.fullName}</option>`)].join("")}</select></label>
               <label class="field-block"><span>Status</span><select id="task-status">${TASK_STATUS_OPTIONS.map((status) => `<option value="${status}">${status}</option>`).join("")}</select></label>
               <label class="field-block"><span>Priority</span><select id="task-priority">${TASK_PRIORITY_OPTIONS.map((priority) => `<option value="${priority}">${priority}</option>`).join("")}</select></label>
@@ -199,12 +199,13 @@ function createProjectModalHtml() {
             <h4 class="form-section-title">Project Details</h4>
             <div class="form-grid">
               <label class="field-block full-width"><span>Project Name <span class="required-indicator">*</span></span><input id="project-name" required placeholder="Enter project name" /></label>
+              <label class="field-block"><span>Client Name <span class="required-indicator">*</span></span><input id="project-client-name" required placeholder="Enter client name" /></label>
+              <label class="field-block"><span>Manager Name <span class="required-indicator">*</span></span><input id="project-manager-name" required placeholder="Enter manager name" /></label>
               <label class="field-block full-width"><span>Description</span><textarea id="project-description" rows="3" placeholder="Add project description..."></textarea></label>
-              <label class="field-block"><span>Region</span><select id="project-region">
+              <label class="field-block"><span>Stack Used <span class="required-indicator">*</span></span><input id="project-stack" required placeholder="e.g., React, Node.js, MongoDB" /></label>
+              <label class="field-block"><span>Location <span class="required-indicator">*</span></span><select id="project-location">
+                <option value="India">India</option>
                 <option value="Australia">Australia</option>
-                <option value="United States">United States</option>
-                <option value="Europe">Europe</option>
-                <option value="Asia">Asia</option>
                 <option value="Other">Other</option>
               </select></label>
             </div>
@@ -350,7 +351,7 @@ async function openTaskModal(task = null) {
 
   // Update project dropdown with latest projects
   const projects = state.projects || [];
-  projectInput.innerHTML = `<option value="">General</option>${projects.map((project) => `<option value="${project.id}">${project.name}</option>`).join("")}`;
+  projectInput.innerHTML = `<option value="">General</option>${projects.map((project) => `<option value="${project.id}">${project.name} (${project.clientName || 'No Client'})</option>`).join("")}`;
 
   titleEl.textContent = task ? "Edit Task" : "New Task";
   formId.value = task?.id || "";
@@ -389,15 +390,21 @@ function openProjectModal() {
   const modal = document.getElementById("project-modal");
   const titleEl = document.getElementById("project-modal-title");
   const nameInput = document.getElementById("project-name");
+  const clientNameInput = document.getElementById("project-client-name");
+  const managerNameInput = document.getElementById("project-manager-name");
   const descInput = document.getElementById("project-description");
-  const regionInput = document.getElementById("project-region");
+  const stackInput = document.getElementById("project-stack");
+  const locationInput = document.getElementById("project-location");
 
-  if (!modal || !titleEl || !nameInput || !descInput || !regionInput) return;
+  if (!modal || !titleEl || !nameInput || !clientNameInput || !managerNameInput || !descInput || !stackInput || !locationInput) return;
 
   titleEl.textContent = "New Project";
   nameInput.value = "";
+  clientNameInput.value = "";
+  managerNameInput.value = "";
   descInput.value = "";
-  regionInput.value = "Australia";
+  stackInput.value = "";
+  locationInput.value = "India";
 
   modal.style.display = "flex";
   
@@ -478,15 +485,21 @@ async function updateTaskStatus(taskId, status) {
 
 async function saveProject() {
   const nameInput = document.getElementById("project-name");
+  const clientNameInput = document.getElementById("project-client-name");
+  const managerNameInput = document.getElementById("project-manager-name");
   const descInput = document.getElementById("project-description");
-  const regionInput = document.getElementById("project-region");
+  const stackInput = document.getElementById("project-stack");
+  const locationInput = document.getElementById("project-location");
 
-  if (!nameInput || !descInput || !regionInput) return;
+  if (!nameInput || !clientNameInput || !managerNameInput || !descInput || !stackInput || !locationInput) return;
 
   const payload = {
     name: nameInput.value.trim(),
+    clientName: clientNameInput.value.trim(),
+    managerName: managerNameInput.value.trim(),
     description: descInput.value.trim(),
-    region: regionInput.value,
+    stack: stackInput.value.trim(),
+    location: locationInput.value,
   };
 
   if (!payload.name) {
@@ -501,17 +514,35 @@ async function saveProject() {
     return;
   }
 
+  if (!payload.clientName) {
+    alert("Client name is required.");
+    clientNameInput.focus();
+    return;
+  }
+
+  if (!payload.managerName) {
+    alert("Manager name is required.");
+    managerNameInput.focus();
+    return;
+  }
+
+  if (!payload.stack) {
+    alert("Stack used is required.");
+    stackInput.focus();
+    return;
+  }
+
   try {
     await createProject(payload);
     await loadProjects();
-    renderTasks();
+    refreshTasks();
     closeProjectModal();
     
     // Update task modal project dropdown
     const taskProjectInput = document.getElementById("task-project");
     if (taskProjectInput) {
       const projects = state.projects || [];
-      taskProjectInput.innerHTML = `<option value="">General</option>${projects.map((project) => `<option value="${project.id}">${project.name}</option>`).join("")}`;
+      taskProjectInput.innerHTML = `<option value="">General</option>${projects.map((project) => `<option value="${project.id}">${project.name} (${project.clientName || 'No Client'})</option>`).join("")}`;
     }
   } catch (error) {
     alert("Failed to create project. Please try again.");
@@ -522,6 +553,64 @@ async function saveProject() {
 async function refreshTasks() {
   await loadTasks({ status: state.taskFilter.status, projectId: state.taskFilter.projectId, assigneeId: state.taskFilter.assigneeId });
   renderTasks();
+}
+
+function renderTasks() {
+  const taskBoardColumns = document.getElementById("task-board-columns");
+  const taskTableBody = document.getElementById("task-table-body");
+  const tasksEmpty = document.getElementById("tasks-empty");
+  
+  if (state.taskView === "board" && taskBoardColumns) {
+    taskBoardColumns.innerHTML = "";
+    const statuses = state.taskStatuses || TASK_STATUS_OPTIONS;
+    statuses.forEach((status) => {
+      const column = document.createElement("div");
+      column.className = "task-status-column";
+      column.dataset.status = status;
+      column.innerHTML = `
+        <h3>${status}</h3>
+        <div class="task-status-list">
+          ${(state.tasks || []).filter((task) => task.status === status).map((task) => createTaskCard(task)).join("")}
+        </div>
+      `;
+      taskBoardColumns.appendChild(column);
+    });
+    
+    if (state.tasks.length === 0) {
+      const emptyNote = document.createElement("p");
+      emptyNote.className = "empty-note";
+      emptyNote.textContent = "No tasks available. Create a new ticket to get started.";
+      taskBoardColumns.parentNode.appendChild(emptyNote);
+    }
+    
+    setupBoardDragEvents();
+  } else if (state.taskView === "list" && taskTableBody) {
+    const rows = (state.tasks || []).map((task) => `
+      <tr data-task-id="${task.id}">
+        <td>${task.title}</td>
+        <td>${task.projectName || "General"}</td>
+        <td>${task.assigneeName || "Unassigned"}</td>
+        <td>${task.status}</td>
+        <td>${task.priority}</td>
+        <td>${task.dueDate ? formatDate(task.dueDate, getUserTimeZone()) : "—"}</td>
+        <td><button type="button" class="mini-action" data-action="view-task" data-id="${task.id}">Details</button></td>
+      </tr>
+    `).join("");
+    taskTableBody.innerHTML = rows;
+    
+    if (tasksEmpty) {
+      tasksEmpty.style.display = state.tasks.length ? "none" : "block";
+    }
+    
+    // Re-attach view task listeners
+    const viewButtons = Array.from(document.querySelectorAll("[data-action='view-task']"));
+    viewButtons.forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+        await openTaskDetails(id);
+      });
+    });
+  }
 }
 
 async function openTaskDetails(id) {
@@ -648,11 +737,12 @@ async function submitTaskAttachment() {
 async function initTasksPage() {
   state.taskFilter = state.taskFilter || { status: null, projectId: null, assigneeId: null };
   state.taskView = state.taskView || "board";
-  await Promise.all([loadProjects(), loadTeamUsers()]);
+  await Promise.all([loadProjects(), loadTeamUsers(), loadToday()]);
   await loadTasks(state.taskFilter);
   root.innerHTML = createTasksTemplate();
   attachDashboardListeners();
   attachTaskListeners();
+  updateButtons();
 }
 
 async function renderTasksPage() {

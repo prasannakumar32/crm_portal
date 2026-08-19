@@ -129,7 +129,7 @@ router.post("/leaves", async (req, res) => {
     const leave = await db.createLeave({
       name,
       type: type || "Annual Leave",
-      location: location || "Australia",
+      location: location || user.location || "India",
       startDate,
       endDate,
       reason,

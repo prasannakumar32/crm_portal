@@ -11,6 +11,9 @@ async function init() {
     if (page === "tasks") {
       initTasksPage().catch(() => {});
     }
+    if (page === "timesheets" || page === "timeoff" || page === "work-schedules" || page === "user-management") {
+      loadToday().catch(() => {});
+    }
   });
 
   // Start clock after a short delay to ensure functions are loaded
@@ -30,7 +33,10 @@ async function init() {
     } else if (state.page === "tasks") {
       await initTasksPage();
     } else if (state.page === "user-management") {
+      await loadToday();
       await loadUsers();
+    } else if (state.page === "timesheets" || state.page === "timeoff" || state.page === "work-schedules") {
+      await loadToday();
     }
   }
   render();

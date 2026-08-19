@@ -35,6 +35,49 @@ const SEED_USERS = [
   },
 ];
 
+const SEED_PROJECTS = [
+  {
+    name: "E-Commerce Platform",
+    clientName: "TechCorp India",
+    managerName: "Rajesh Kumar",
+    description: "Full-stack e-commerce platform with payment integration and inventory management",
+    stack: "React, Node.js, MongoDB, Stripe API",
+    location: "India",
+  },
+  {
+    name: "Healthcare App",
+    clientName: "MediCare Australia",
+    managerName: "Sarah Williams",
+    description: "Patient management system with appointment scheduling and telemedicine features",
+    stack: "Angular, Python, PostgreSQL, AWS",
+    location: "Australia",
+  },
+  {
+    name: "Financial Dashboard",
+    clientName: "Global Finance Ltd",
+    managerName: "David Chen",
+    description: "Real-time financial analytics dashboard with reporting capabilities",
+    stack: "Vue.js, Java, MySQL, Docker",
+    location: "Other",
+  },
+  {
+    name: "Educational Portal",
+    clientName: "EduTech Solutions",
+    managerName: "Priya Sharma",
+    description: "Online learning platform with video courses and interactive assessments",
+    stack: "React, Node.js, MongoDB, Cloudinary",
+    location: "India",
+  },
+  {
+    name: "Logistics Management",
+    clientName: "Transport NSW",
+    managerName: "Michael Brown",
+    description: "Supply chain management system with tracking and route optimization",
+    stack: "React, Node.js, PostgreSQL, Google Maps API",
+    location: "Australia",
+  },
+];
+
 const SEED_LEAVES = [
   {
     name: "Pongal Festival",
@@ -168,6 +211,7 @@ async function seedDatabase() {
     await db.collection("users").deleteMany({});
     await db.collection("attendance").deleteMany({});
     await db.collection("leaves").deleteMany({});
+    await db.collection("projects").deleteMany({});
 
     // Create users
     console.log("👥 Creating users...");
@@ -224,6 +268,17 @@ async function seedDatabase() {
     }));
     await db.collection("leaves").insertMany(leavesWithIds);
     console.log(`✅ Inserted ${leavesWithIds.length} sample leave records.`);
+
+    // Insert project data
+    console.log("🚀 Creating sample project data...");
+    const projectsWithIds = SEED_PROJECTS.map((project) => ({
+      ...project,
+      ownerId: createdUsers.find(u => u.role === "admin")?.id || createdUsers[0].id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+    await db.collection("projects").insertMany(projectsWithIds);
+    console.log(`✅ Inserted ${projectsWithIds.length} sample project records.`);
 
     console.log("✅ Database seeding completed successfully!");
     console.log("\n📋 Summary:");

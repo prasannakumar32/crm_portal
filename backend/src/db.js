@@ -83,12 +83,15 @@ async function getProjects() {
   return projects.map((project) => ({ ...project, id: project._id.toString() }));
 }
 
-async function createProject({ name, description, region, ownerId }) {
+async function createProject({ name, clientName, managerName, description, stack, location, ownerId }) {
   const db = await getDb();
   const doc = {
     name: String(name).trim(),
+    clientName: String(clientName).trim(),
+    managerName: String(managerName).trim(),
     description: String(description || "").trim(),
-    region: region || "Australia",
+    stack: String(stack).trim(),
+    location: location || "India",
     ownerId: ownerId || null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

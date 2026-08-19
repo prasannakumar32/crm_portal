@@ -53,13 +53,20 @@ router.post("/projects", async (req, res) => {
   if (!user) return res.status(401).json({ error: "Not signed in." });
   if (user.role !== "admin") return res.status(403).json({ error: "Only admins can create projects." });
 
-  const { name, description, region } = req.body || {};
+  const { name, clientName, managerName, description, stack, location } = req.body || {};
   if (!name) return res.status(400).json({ error: "Project name is required." });
+  if (!clientName) return res.status(400).json({ error: "Client name is required." });
+  if (!managerName) return res.status(400).json({ error: "Manager name is required." });
+  if (!stack) return res.status(400).json({ error: "Stack used is required." });
+  if (!location) return res.status(400).json({ error: "Location is required." });
 
   const project = await db.createProject({
     name,
+    clientName,
+    managerName,
     description: description || "",
-    region: region || user.location || "Australia",
+    stack,
+    location,
     ownerId: user.id,
   });
 
