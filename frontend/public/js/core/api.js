@@ -20,15 +20,16 @@ function apiUrl(path) {
 async function loadMe() {
   try {
     const data = await apiJson("/api/auth/me");
-    state.user = data.user;
+    state.employee = data.employee || null;
+    state.user = state.employee;
     hydrateProfileFromUser();
     if (state.user) {
-      const allowedLoggedInPages = ["dashboard", "timesheets", "timeoff", "work-schedules", "tasks", "user-management"];
+      const allowedLoggedInPages = Object.keys(PAGE_DEFINITIONS);
       if (!allowedLoggedInPages.includes(state.page)) {
         setPage("dashboard", false);
         return;
       }
-    } else if (state.page === "dashboard" || state.page === "timesheets" || state.page === "timeoff" || state.page === "work-schedules" || state.page === "tasks" || state.page === "user-management") {
+    } else if (Object.keys(PAGE_DEFINITIONS).includes(state.page)) {
       setPage("login", false);
       return;
     }
@@ -124,6 +125,20 @@ async function loadLeaves() {
   }
 }
 
+async function loadPublicHolidays(country = state.holidayCountry, year = state.holidayYear) {
+  state.holidayLoading = true;
+  try {
+    const data = await apiJson(`/api/holidays?country=${encodeURIComponent(country)}&year=${year}`);
+    state.holidayCountry = data.country;
+    state.holidayYear = data.year;
+    state.holidayData = data.holidays || [];
+    state.holidaySource = data.source || "calendar";
+    return data;
+  } finally {
+    state.holidayLoading = false;
+  }
+}
+
 async function createLeave(payload) {
   if (!payload) return null;
   return apiJson("/api/attendance/leaves", {
@@ -149,30 +164,32 @@ async function deleteLeave(id) {
   });
 }
 
-async function createUser(payload) {
+async function createEmployee(payload) {
   if (!payload) return null;
-  return apiJson("/api/auth/create-user", {
+  return apiJson("/api/auth/create-employee", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 }
 
-async function loadUsers() {
+async function loadEmployees() {
   try {
-    const data = await apiJson("/api/tasks/users");
-    state.users = data.users || [];
-    return data;
+    const data = await apiJson("/api/tasks/employees");
+    state.employees = data.employees || [];
+    state.users = state.employees;
+    return { employees: state.employees };
   } catch (error) {
-    console.log("Users API not available, using empty data");
+    console.log("Employees API not available, using empty data");
+    state.employees = [];
     state.users = [];
-    return { users: [] };
+    return { employees: [] };
   }
 }
 
-async function updateUserBreakAllowance(userId, dailyBreakAllowanceMinutes) {
-  if (!userId || dailyBreakAllowanceMinutes === undefined) return null;
-  return apiJson(`/api/auth/users/${userId}/break-allowance`, {
+async function updateEmployeeBreakAllowance(employeeId, dailyBreakAllowanceMinutes) {
+  if (!employeeId || dailyBreakAllowanceMinutes === undefined) return null;
+  return apiJson(`/api/auth/employees/${employeeId}/break-allowance`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ dailyBreakAllowanceMinutes }),

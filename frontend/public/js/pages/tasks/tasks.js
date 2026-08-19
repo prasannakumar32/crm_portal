@@ -19,9 +19,10 @@ async function loadProjects() {
   return data;
 }
 
-async function loadTeamUsers() {
-  const data = await apiJson("/api/tasks/users");
-  state.teamUsers = data.users || [];
+async function loadTeamEmployees() {
+  const data = await apiJson("/api/tasks/employees");
+  state.teamEmployees = data.employees || [];
+  state.teamUsers = state.teamEmployees;
   return data;
 }
 
@@ -737,7 +738,7 @@ async function submitTaskAttachment() {
 async function initTasksPage() {
   state.taskFilter = state.taskFilter || { status: null, projectId: null, assigneeId: null };
   state.taskView = state.taskView || "board";
-  await Promise.all([loadProjects(), loadTeamUsers(), loadToday()]);
+  await Promise.all([loadProjects(), loadTeamEmployees(), loadToday()]);
   await loadTasks(state.taskFilter);
   root.innerHTML = createTasksTemplate();
   attachDashboardListeners();

@@ -68,6 +68,7 @@ function saveSchedules() {
 
 const state = {
   page: location.hash.slice(1) || "home",
+  employee: null,
   user: null,
   error: null,
   submitting: false,
@@ -79,7 +80,9 @@ const state = {
   tasks: [],
   taskStatuses: [],
   projects: [],
+  teamEmployees: [],
   teamUsers: [],
+  employees: [],
   users: [],
   taskFilter: { status: null, projectId: null, assigneeId: null },
   taskView: "board",
@@ -90,6 +93,12 @@ const state = {
     { id: 3, name: "Sydney early shift", date: "2026-08-13", shift: "Morning", start: "08:00", end: "16:00", location: "Sydney Office", assigned: "Rohan", status: "Confirmed" },
   ],
   leaveData: [],
+  dashboardLeaveLimits: { holidays: 3, timeOff: 3 },
+  holidayCountry: "IN",
+  holidayYear: new Date().getFullYear(),
+  holidayData: [],
+  holidayLoading: false,
+  holidaySource: "calendar",
   locationLabel: "Locating…",
   clock: new Date(),
   breakAllowance: {

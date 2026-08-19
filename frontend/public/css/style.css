@@ -1,4 +1,5 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,300,0,0");
 
 :root {
   --primary: #2c7a7a;
@@ -241,10 +242,12 @@ button {
   border-radius: 8px;
   transition: all 0.2s ease;
 }
-.password-toggle svg {
+.password-toggle .material-symbols-outlined {
   width: 20px;
   height: 20px;
   display: block;
+  font-size: 20px;
+  line-height: 1;
 }
 .password-toggle:hover {
   color: #3b82f6;
@@ -259,10 +262,6 @@ button {
 .password-toggle:active {
   transform: translateY(-50%) scale(0.95);
 }
-.password-toggle svg {
-  stroke: currentColor;
-}
-
 /* ============ DASHBOARD ============ */
 
 .portal-shell {
@@ -437,22 +436,77 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 24px;
   padding: 0 28px;
   background: linear-gradient(135deg, #d2ebee 0%, #eefbfb 50%, #d6dde6 100%);
   border-bottom: 1px solid #ccd8e5;
 }
 
 .app-header h1 {
+  flex: 0 0 auto;
   margin: 0;
   font-size: 34px;
-  line-height: 1;
+  line-height: 1.05;
   color: var(--text-primary);
 }
 
+.page-header-user-management h1 {
+  font-size: 28px;
+  white-space: nowrap;
+}
+
+.page-header-user-management {
+  gap: 16px;
+  padding-left: 26px;
+  padding-right: 26px;
+}
+
+.page-header-user-management .header-actions {
+  gap: 8px;
+}
+
+.page-header-user-management .current-time,
+.page-header-user-management .login-time {
+  padding: 8px 10px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.page-header-user-management .user-chip {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.page-header-user-management .badge {
+  padding: 8px 10px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.page-header-user-management .header-icon-actions {
+  gap: 5px;
+  padding: 6px;
+  border-radius: 11px;
+}
+
+.page-header-user-management .header-icon-actions .icon-action-button.small {
+  min-height: 36px;
+  padding: 5px 8px;
+  border-radius: 8px;
+}
+
+.page-header-user-management .header-icon-actions .icon-action-button.small .icon-text {
+  font-size: 8px;
+  letter-spacing: 0.06em;
+}
+
 .header-actions {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 14px;
 }
 
@@ -468,10 +522,14 @@ button {
 }
 
 .header-icon-actions {
+  flex: 0 1 auto;
+  min-width: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
-  margin-left: auto;
+  margin-left: 0;
   padding: 8px;
   border-radius: 14px;
   background: linear-gradient(135deg, #2a4b58 0%, #16323c 100%);
@@ -480,6 +538,7 @@ button {
 }
 
 .header-icon-actions .icon-action-button.small {
+  flex: 0 0 auto;
   min-height: 38px;
   padding: 6px 12px;
   border-radius: 11px;
@@ -542,10 +601,195 @@ button {
   background: linear-gradient(135deg, #8b5cf6, #7c3aed);
 }
 
+@media (max-width: 1500px) and (min-width: 761px) {
+  .app-header {
+    align-items: flex-start;
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+
+  .header-actions {
+    display: grid;
+    grid-template-columns: repeat(4, auto);
+    justify-content: end;
+    gap: 8px 10px;
+  }
+
+  .header-icon-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .page-header-user-management h1 {
+    font-size: 26px;
+  }
+}
+
 .content-panel.dashboard-frame {
   padding: 26px;
   background: linear-gradient(180deg, #e9f4f7 0%, #dcecf2 100%);
   border-radius: 0 0 14px 14px;
+}
+
+.holidays-page-card {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 30px;
+  background: #ffffff;
+}
+
+.holidays-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.holidays-page-header h2 {
+  margin: 4px 0 6px;
+  font-size: 24px;
+  color: #15343b;
+}
+
+.holidays-page-header p {
+  margin: 0;
+  color: #64748b;
+}
+
+.eyebrow {
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.holiday-switch {
+  display: inline-flex;
+  gap: 4px;
+  margin: 24px 0 18px;
+  padding: 4px;
+  border: 1px solid #dbe4ea;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.holiday-switch-button {
+  min-width: 110px;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.holiday-switch-button.active {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.holiday-year-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+  font-weight: 700;
+}
+
+.holiday-year-button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #dbe4ea;
+  border-radius: 6px;
+  color: #256b72;
+  font-size: 22px;
+}
+
+.calendar-holiday-list {
+  display: grid;
+  gap: 8px;
+}
+
+.calendar-holiday-row {
+  display: grid;
+  grid-template-columns: 130px 1fr auto;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 12px;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.calendar-holiday-date {
+  color: #256b72;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.calendar-holiday-content {
+  display: grid;
+  gap: 3px;
+}
+
+.calendar-holiday-content strong {
+  color: #1e293b;
+  font-size: 14px;
+}
+
+.calendar-holiday-content span,
+.calendar-source {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.calendar-holiday-type {
+  padding: 5px 9px;
+  border-radius: 5px;
+  background: #eef8f6;
+  color: #28716f;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.calendar-loading {
+  padding: 42px 12px;
+  color: #64748b;
+  text-align: center;
+}
+
+.calendar-source {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #eef2f6;
+}
+
+@media (max-width: 640px) {
+  .holidays-page-card {
+    padding: 20px;
+  }
+
+  .holidays-page-header {
+    display: block;
+  }
+
+  .holiday-year-controls {
+    margin-top: 18px;
+  }
+
+  .calendar-holiday-row {
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
+  }
+
+  .calendar-holiday-content {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
 }
 
 .period-tabs {
@@ -587,7 +831,7 @@ button {
 
 .hero-area {
   display: grid;
-  grid-template-columns: minmax(620px, 1fr) minmax(330px, 370px);
+  grid-template-columns: minmax(420px, 1.3fr) minmax(250px, 0.85fr) minmax(250px, 0.85fr);
   gap: 24px;
   align-items: stretch;
   margin-bottom: 22px;
@@ -654,6 +898,42 @@ button {
 .holidays-card h2 {
   font-size: 16px;
   margin-bottom: 14px;
+}
+
+.leave-summary-card {
+  min-width: 0;
+}
+
+.card-subtitle {
+  display: block;
+  color: #94a3b8;
+  font-size: 11px;
+  margin-top: -8px;
+  margin-bottom: 14px;
+}
+
+.load-more-leaves {
+  width: 100%;
+  margin-top: 14px;
+  padding: 9px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #256b72;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.load-more-leaves:hover {
+  background: #f0fdfa;
+  border-color: #7dd3c7;
+}
+
+.load-more-leaves span {
+  color: #94a3b8;
+  font-weight: 600;
 }
 
 .icon-button {
@@ -1045,6 +1325,115 @@ button {
 
 .task-modal-card #task-form::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+.employee-modal-card {
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+}
+
+.employee-modal-card #user-form {
+  padding: 26px 28px 28px;
+  background: #ffffff;
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+}
+
+.employee-modal-card #user-form::-webkit-scrollbar {
+  width: 8px;
+}
+
+.employee-modal-card #user-form::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.employee-modal-card #user-form::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
+.employee-modal-card .form-section {
+  margin: 0;
+  padding: 0 0 22px;
+}
+
+.employee-modal-card .form-section + .form-section {
+  padding-top: 22px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.employee-modal-card .form-section:last-child {
+  padding-bottom: 0;
+}
+
+.employee-modal-card .form-section-title {
+  margin: 0 0 14px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.employee-modal-card .form-grid {
+  gap: 16px;
+}
+
+.employee-modal-card .field-block {
+  gap: 7px;
+}
+
+.employee-modal-card .field-block input,
+.employee-modal-card .field-block select {
+  min-height: 42px;
+  border-color: #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.employee-modal-card .field-block input:focus,
+.employee-modal-card .field-block select:focus {
+  border-color: #2b7a78;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(43, 122, 120, 0.12);
+}
+
+.employee-modal-card .form-actions-grid {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.employee-modal-card .form-actions-grid button {
+  min-width: 132px;
+}
+
+@media (max-width: 600px) {
+  .employee-modal-card {
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+  }
+
+  .employee-modal-card .task-modal-header {
+    padding: 18px 20px;
+  }
+
+  .employee-modal-card #user-form {
+    padding: 20px;
+    max-height: calc(100vh - 94px);
+  }
+
+  .employee-modal-card .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .employee-modal-card .form-actions-grid {
+    flex-direction: column-reverse;
+  }
+
+  .employee-modal-card .form-actions-grid button {
+    width: 100%;
+  }
 }
 
 /* ============ TASK BOARD & FILTER ============ */
@@ -3145,5 +3534,179 @@ table.history tbody tr:hover {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Simple form system */
+.auth-card,
+.task-modal-card,
+.leave-modal-card {
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+  animation: none;
+}
+
+.auth-card {
+  padding: 32px;
+}
+
+.task-modal-header,
+.leave-modal-header {
+  padding: 18px 22px;
+  background: #ffffff;
+}
+
+.task-modal-header h3,
+.leave-modal-header h3 {
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+.task-modal-card #task-form,
+.employee-modal-card #user-form,
+.leave-modal-card #leave-form {
+  padding: 22px;
+  background: #ffffff;
+  max-height: 75vh;
+}
+
+.form-section {
+  padding: 0 0 18px;
+  margin-bottom: 18px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.form-section + .form-section {
+  padding-top: 18px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.form-section-title {
+  margin-bottom: 12px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.form-section-title::before {
+  display: none;
+}
+
+.field,
+.field-block {
+  gap: 6px;
+}
+
+.field label,
+.field-block span {
+  margin-bottom: 0;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.field input,
+.field-block input,
+.field-block select,
+.field-block textarea,
+.task-detail-form input,
+.task-detail-form textarea {
+  min-height: 40px;
+  height: 40px;
+  padding: 9px 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: none;
+  font-size: 14px;
+  transform: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.field-block textarea,
+.task-detail-form textarea {
+  height: auto;
+  min-height: 88px;
+  resize: vertical;
+}
+
+.field input:focus,
+.field-block input:focus,
+.field-block select:focus,
+.field-block textarea:focus,
+.task-detail-form input:focus,
+.task-detail-form textarea:focus {
+  border-color: var(--primary);
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(44, 122, 122, 0.14);
+  outline: none;
+  transform: none;
+}
+
+.field-block input:hover,
+.field-block select:hover,
+.field-block textarea:hover {
+  border-color: #94a3b8;
+  background: #ffffff;
+}
+
+.field-block select {
+  padding-right: 36px;
+  background-size: 14px;
+  background-position: right 10px center;
+}
+
+.auth-card .btn-primary,
+.task-modal-card .btn-primary,
+.leave-modal-card .btn-primary,
+.modal-actions .btn {
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  box-shadow: none;
+  transform: none;
+}
+
+.auth-card .btn-primary:hover:not(:disabled),
+.task-modal-card .btn-primary:hover:not(:disabled),
+.leave-modal-card .btn-primary:hover:not(:disabled),
+.modal-actions .btn:hover:not(:disabled) {
+  background: var(--primary-dark);
+  box-shadow: none;
+  transform: none;
+}
+
+.modal-actions {
+  margin: 18px 0 0;
+  padding: 18px 0 0;
+  border-top: 1px solid #e2e8f0;
+  background: transparent;
+  border-radius: 0;
+}
+
+.modal-actions .btn::before {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .auth-card {
+    padding: 24px;
+  }
+
+  .task-modal-card,
+  .leave-modal-card {
+    border-radius: 8px;
+  }
+
+  .task-modal-card #task-form,
+  .employee-modal-card #user-form,
+  .leave-modal-card #leave-form {
+    padding: 18px;
   }
 }

@@ -144,7 +144,7 @@ const SEED_LEAVES = [
   },
 ];
 
-function buildSampleEvents(userId, username, dayOffset, startHour = 9) {
+function buildSampleEvents(employeeId, username, dayOffset, startHour = 9) {
   const userStartHour = startHour + (username === "muthu" ? 2 : 0);
   const baseDate = new Date();
   baseDate.setHours(0, 0, 0, 0);
@@ -164,7 +164,7 @@ function buildSampleEvents(userId, username, dayOffset, startHour = 9) {
 
   return [
     {
-      userId: String(userId),
+      employeeId: String(employeeId),
       type: "check_in",
       timestampUtc: checkIn.toISOString(),
       latitude: -33.8688,
@@ -172,7 +172,7 @@ function buildSampleEvents(userId, username, dayOffset, startHour = 9) {
       address: username === "muthu" ? "Sydney, Australia" : "Workplace",
     },
     {
-      userId: String(userId),
+      employeeId: String(employeeId),
       type: "break_start",
       timestampUtc: breakStart.toISOString(),
       latitude: -33.8688,
@@ -180,7 +180,7 @@ function buildSampleEvents(userId, username, dayOffset, startHour = 9) {
       address: username === "muthu" ? "Sydney, Australia" : "Workplace",
     },
     {
-      userId: String(userId),
+      employeeId: String(employeeId),
       type: "break_end",
       timestampUtc: breakEnd.toISOString(),
       latitude: -33.8688,
@@ -188,7 +188,7 @@ function buildSampleEvents(userId, username, dayOffset, startHour = 9) {
       address: username === "muthu" ? "Sydney, Australia" : "Workplace",
     },
     {
-      userId: String(userId),
+      employeeId: String(employeeId),
       type: "check_out",
       timestampUtc: checkOut.toISOString(),
       latitude: -33.8688,
@@ -209,21 +209,22 @@ async function seedDatabase() {
     // Clear existing users (optional - comment out to preserve data)
     console.log("🗑️  Clearing existing data...");
     await db.collection("users").deleteMany({});
+    await db.collection("employees").deleteMany({});
     await db.collection("attendance").deleteMany({});
     await db.collection("leaves").deleteMany({});
     await db.collection("projects").deleteMany({});
 
     // Create users
     console.log("👥 Creating users...");
-    const createdUsers = [];
+    const createdEmployees = [];
     for (const userData of SEED_USERS) {
       const { username, password, fullName, role, location, timezone } = userData;
       
       // Hash password
       const passwordHash = await bcrypt.hash(password, 10);
       
-      // Create user document
-      const user = {
+      // Create employee document
+      const employee = {
         username,
         normalizedUsername: username.toLowerCase(),
         passwordHash,
@@ -234,9 +235,9 @@ async function seedDatabase() {
         createdAt: new Date().toISOString(),
       };
 
-      const result = await db.collection("users").insertOne(user);
-      createdUsers.push({ ...user, id: result.insertedId.toString(), username, fullName, role, location, timezone });
-      console.log(`✅ Created user: ${fullName} (${role}) - ${location}`);
+      const result = await db.collection("employees").insertOne(employee);
+      createdEmployees.push({ ...employee, id: result.insertedId.toString(), username, fullName, role, location, timezone });
+      console.log(`✅ Created employee: ${fullName} (${role}) - ${location}`);
       console.log(`   Username: ${username}`);
       console.log(`   Password: ${password}`);
       console.log(`   ID: ${result.insertedId}`);
@@ -246,7 +247,7 @@ async function seedDatabase() {
     console.log("🗓️  Creating sample attendance events...");
     const attendanceEvents = [];
     for (let dayOffset = 1; dayOffset < 14; dayOffset += 1) {
-      for (const created of createdUsers) {
+      for (const created of createdEmployees) {
         const gap = dayOffset % 3;
         const startHour = gap === 0 ? 9 : gap === 1 ? 8 : 10;
         const events = buildSampleEvents(created.id, created.username, dayOffset, startHour);
@@ -273,7 +274,7 @@ async function seedDatabase() {
     console.log("🚀 Creating sample project data...");
     const projectsWithIds = SEED_PROJECTS.map((project) => ({
       ...project,
-      ownerId: createdUsers.find(u => u.role === "admin")?.id || createdUsers[0].id,
+      ownerId: createdEmployees.find(employee => employee.role === "admin")?.id || createdEmployees[0].id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }));
@@ -283,13 +284,13 @@ async function seedDatabase() {
     console.log("✅ Database seeding completed successfully!");
     console.log("\n📋 Summary:");
     console.log("─".repeat(50));
-    console.log("User 1: Prasanna (Employee) - India");
+    console.log("Employee 1: Prasanna - India");
     console.log("  └─ Username: prasanna | Password: Prasanna@123");
     console.log("");
-    console.log("User 2: Muthu (Admin) - Australia");
+    console.log("Employee 2: Muthu (Admin) - Australia");
     console.log("  └─ Username: muthu | Password: Muthu@123");
     console.log("");
-    console.log("User 3: Kishanthi (Employee) - Australia");
+    console.log("Employee 3: Kishanthi - Australia");
     console.log("  └─ Username: kishanthi | Password: Kishanthi@123");
     console.log("─".repeat(50));
     

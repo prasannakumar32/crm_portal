@@ -13,11 +13,11 @@ const ACTION_LABEL = {
 
 function recordAction(type) {
   return async (req, res) => {
-    const userId = req.session.userId;
-    const user = await db.findUserById(userId);
-    const userTimeZone = user && (user.timezone || null);
-    const events = await db.getEventsForUser(userId);
-    const { status } = logic.getStatus(events, userTimeZone);
+    const employeeId = req.session.employeeId || req.session.userId;
+    const employee = await db.findEmployeeById(employeeId);
+    const employeeTimeZone = employee && (employee.timezone || null);
+    const events = await db.getEventsForEmployee(employeeId);
+    const { status } = logic.getStatus(events, employeeTimeZone);
 
     if (!logic.canPerform(status, type)) {
       return res.status(409).json({
@@ -35,9 +35,9 @@ function recordAction(type) {
       }
 
       // Check break time allowance
-      const { todayEvents } = logic.getStatus(events, userTimeZone);
+      const { todayEvents } = logic.getStatus(events, employeeTimeZone);
       const durations = logic.computeDurations(todayEvents);
-      const dailyBreakAllowanceMinutes = user.dailyBreakAllowanceMinutes || 60;
+      const dailyBreakAllowanceMinutes = employee.dailyBreakAllowanceMinutes || 60;
       const usedBreakMinutes = Math.floor(durations.breakSeconds / 60);
 
       if (usedBreakMinutes >= dailyBreakAllowanceMinutes) {
@@ -52,7 +52,7 @@ function recordAction(type) {
     }
 
     const event = await db.addEvent({
-      userId,
+      employeeId,
       type,
       latitude: typeof latitude === "number" ? latitude : null,
       longitude: typeof longitude === "number" ? longitude : null,
@@ -60,8 +60,8 @@ function recordAction(type) {
       reason: typeof reason === "string" ? reason.trim().slice(0, 200) : null,
     });
 
-    const updated = await db.getEventsForUser(userId);
-    const { status: newStatus, todayEvents } = logic.getStatus(updated, userTimeZone);
+    const updated = await db.getEventsForEmployee(employeeId);
+    const { status: newStatus, todayEvents } = logic.getStatus(updated, employeeTimeZone);
     const durations = logic.computeDurations(todayEvents);
 
     res.json({ event, status: newStatus, today: todayEvents, durations });
@@ -74,12 +74,13 @@ router.post("/break-end", recordAction("break_end"));
 router.post("/check-out", recordAction("check_out"));
 
 router.get("/today", async (req, res) => {
-  const user = await db.findUserById(req.session.userId);
-  const userTimeZone = user && (user.timezone || null);
-  const events = await db.getEventsForUser(req.session.userId);
-  const { status, todayEvents } = logic.getStatus(events, userTimeZone);
+  const employeeId = req.session.employeeId || req.session.userId;
+  const employee = await db.findEmployeeById(employeeId);
+  const employeeTimeZone = employee && (employee.timezone || null);
+  const events = await db.getEventsForEmployee(employeeId);
+  const { status, todayEvents } = logic.getStatus(events, employeeTimeZone);
   const durations = logic.computeDurations(todayEvents);
-  const dailyBreakAllowanceMinutes = user.dailyBreakAllowanceMinutes || 60;
+  const dailyBreakAllowanceMinutes = employee.dailyBreakAllowanceMinutes || 60;
   const usedBreakMinutes = Math.floor(durations.breakSeconds / 60);
   const remainingBreakMinutes = Math.max(0, dailyBreakAllowanceMinutes - usedBreakMinutes);
 
@@ -96,15 +97,16 @@ router.get("/today", async (req, res) => {
 });
 
 router.get("/history", async (req, res) => {
-  const user = await db.findUserById(req.session.userId);
-  const userTimeZone = user && (user.timezone || null);
+  const employeeId = req.session.employeeId || req.session.userId;
+  const employee = await db.findEmployeeById(employeeId);
+  const employeeTimeZone = employee && (employee.timezone || null);
   const period = `${req.query.period || "day"}`.trim().toLowerCase();
-  const events = await db.getEventsForUser(req.session.userId);
+  const events = await db.getEventsForEmployee(employeeId);
 
-  const [startKey, endKey] = logic.getPeriodDateRange(period, userTimeZone);
-  let summaries = logic.buildDailySummariesBetween(events, startKey, endKey, userTimeZone);
+  const [startKey, endKey] = logic.getPeriodDateRange(period, employeeTimeZone);
+  let summaries = logic.buildDailySummariesBetween(events, startKey, endKey, employeeTimeZone);
   if (period === "day") {
-    const [todayKey] = logic.getPeriodDateRange("day", userTimeZone);
+    const [todayKey] = logic.getPeriodDateRange("day", employeeTimeZone);
     summaries = summaries.filter((day) => day.date === todayKey);
   }
   res.json({ days: summaries, period });
@@ -122,6 +124,7 @@ router.get("/leaves", async (req, res) => {
 
 router.post("/leaves", async (req, res) => {
   try {
+    const employee = await db.findEmployeeById(req.session.employeeId || req.session.userId);
     const { name, type, location, startDate, endDate, reason, status } = req.body;
     if (!name || !startDate || !endDate || !reason) {
       return res.status(400).json({ error: "Missing required fields" });
@@ -129,7 +132,7 @@ router.post("/leaves", async (req, res) => {
     const leave = await db.createLeave({
       name,
       type: type || "Annual Leave",
-      location: location || user.location || "India",
+      location: location || employee.location || "India",
       startDate,
       endDate,
       reason,

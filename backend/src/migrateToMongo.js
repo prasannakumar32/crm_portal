@@ -12,10 +12,10 @@ async function migrate() {
   const users = JSON.parse(fs.readFileSync(usersFile, 'utf8') || '[]');
   const events = JSON.parse(fs.readFileSync(eventsFile, 'utf8') || '[]');
 
-  const usersCol = db.collection('users');
+  const employeesCol = db.collection('employees');
   const attCol = db.collection('attendance');
 
-  const uCount = await usersCol.countDocuments();
+  const uCount = await employeesCol.countDocuments();
   const aCount = await attCol.countDocuments();
 
   if (uCount === 0 && users.length) {
@@ -27,15 +27,15 @@ async function migrate() {
       role: u.role === 'user' ? 'employee' : (u.role || 'employee'),
       createdAt: u.createdAt || new Date().toISOString()
     }));
-    await usersCol.insertMany(docs);
-    console.log(`Inserted ${docs.length} users.`);
+    await employeesCol.insertMany(docs);
+    console.log(`Inserted ${docs.length} employees.`);
   } else {
     console.log('Users collection not empty or no users to migrate.');
   }
 
   if (aCount === 0 && events.length) {
     const docs = events.map(e => ({
-      userId: String(e.userId),
+      employeeId: String(e.employeeId || e.userId),
       type: e.type,
       timestampUtc: e.timestampUtc,
       latitude: e.latitude,

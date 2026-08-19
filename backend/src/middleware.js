@@ -1,5 +1,8 @@
 function requireAuth(req, res, next) {
-  if (req.session && req.session.userId) {
+  if (req.session && (req.session.employeeId || req.session.userId)) {
+    if (!req.session.employeeId && req.session.userId) {
+      req.session.employeeId = req.session.userId;
+    }
     return next();
   }
   console.log("Auth check failed - session:", req.session);

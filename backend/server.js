@@ -9,6 +9,7 @@ dotenv.config({ path: path.join(__dirname, "..", ".env") });
 const authRoutes = require("./src/auth");
 const attendanceRoutes = require("./src/attendance");
 const taskRoutes = require("./src/tasks");
+const holidayRoutes = require("./src/holidays");
 const { requireAuth } = require("./src/middleware");
 const { connect: connectMongo } = require("./src/mongo");
 
@@ -74,6 +75,7 @@ app.use(
 app.use("/api/auth", authRoutes);
 app.use("/api/attendance", requireAuth, attendanceRoutes);
 app.use("/api/tasks", requireAuth, taskRoutes);
+app.use("/api/holidays", requireAuth, holidayRoutes);
 
 const publicPath = path.join(__dirname, "..", "frontend", "public");
 

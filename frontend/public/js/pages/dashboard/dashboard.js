@@ -55,7 +55,7 @@ function setPage(page, updateHash = true) {
 // ============================================================================
 
 function render() {
-  const allowedLoggedInPages = ["dashboard", "timesheets", "timeoff", "work-schedules", "tasks", "user-management"];
+  const allowedLoggedInPages = Object.keys(PAGE_DEFINITIONS);
 
   if (state.user) {
     if (!allowedLoggedInPages.includes(state.page)) {
@@ -74,36 +74,18 @@ function render() {
     }
   }
 
-  switch (state.page) {
-    case "login":
-      renderLogin();
-      break;
-    case "dashboard":
-      renderDashboard();
-      break;
-    case "timesheets":
-      renderTimesheets();
-      break;
-    case "timeoff":
-      renderTimeOff();
-      break;
-    case "work-schedules":
-      renderWorkSchedules();
-      break;
-    case "tasks":
-      renderTasksPage();
-      break;
-    case "user-management":
-      renderUserManagement();
-      break;
-    default:
-      if (state.user) {
-        setPage("dashboard", false);
-      } else {
-        setPage("login", false);
-      }
-      break;
+  if (state.page === "login") {
+    renderLogin();
+    return;
   }
+
+  const pageDefinition = getPageDefinition(state.page);
+  if (pageDefinition) {
+    pageDefinition.render();
+    return;
+  }
+
+  setPage(state.user ? "dashboard" : "login", false);
 }
 
 function getLoginTimeText() {
@@ -151,6 +133,7 @@ function createPageShell(title, contentHtml) {
         <div class="nav-title${state.page === "dashboard" ? " active" : ""}" data-page="dashboard"><span>Dashboard</span></div>
         <div class="nav-title${state.page === "timesheets" ? " active" : ""}" data-page="timesheets"><span>Timesheets</span></div>
         <div class="nav-title${state.page === "timeoff" ? " active" : ""}" data-page="timeoff"><span>Time Off</span></div>
+        <div class="nav-title${state.page === "holidays" ? " active" : ""}" data-page="holidays"><span>Upcoming Holidays</span></div>
         <div class="nav-title${state.page === "tasks" ? " active" : ""}" data-page="tasks"><span>Tasks</span></div>
         <div class="nav-section-title">Settings</div>
         <div class="nav-title${state.page === "work-schedules" ? " active" : ""}" data-page="work-schedules"><span>Work Schedules</span></div>
@@ -169,7 +152,7 @@ function createPageShell(title, contentHtml) {
       <button class="btn btn-ghost sidebar-logout" id="logout-btn" type="button">Log out</button>
     </aside>
     <section class="workspace">
-      <header class="app-header">
+      <header class="app-header page-header-${state.page}">
         <div><h1>${title}</h1></div>
         <div class="header-actions">
           <span class="current-time" id="current-time-label">—</span>
@@ -240,7 +223,7 @@ function createDashboardTemplate() {
   const breakAllowancePercent = Math.min(100, Math.round((breakAllowance.usedBreakMinutes / breakAllowance.dailyBreakAllowanceMinutes) * 100));
   const breakAllowanceStatus = breakAllowance.remainingBreakMinutes <= 0 ? 'exceeded' : breakAllowance.remainingBreakMinutes <= 15 ? 'warning' : 'ok';
 
-  const leaveRows = (state.leaveData || []).map((item) => {
+  const renderLeaveRows = (items) => items.map((item) => {
     const start = new Date(item.startDate);
     const month = start.toLocaleString("en", { month: "short" }).toUpperCase();
     const day = String(start.getDate()).padStart(2, "0");
@@ -264,6 +247,26 @@ function createDashboardTemplate() {
     </div>`;
   }).join("");
 
+  const upcomingHolidays = (state.leaveData || []).filter((item) => String(item.type || "").toLowerCase() === "holiday");
+  const timeOffItems = (state.leaveData || []).filter((item) => String(item.type || "").toLowerCase() !== "holiday");
+  const holidayLimit = state.dashboardLeaveLimits?.holidays || 3;
+  const timeOffLimit = state.dashboardLeaveLimits?.timeOff || 3;
+  const createLeaveCard = (title, items, limit, key, emptyText) => {
+    const visibleItems = items.slice(0, limit);
+    const remaining = Math.max(0, items.length - limit);
+    return `<aside class="card holidays-card leave-summary-card">
+      <div class="card-title-row">
+        <div>
+          <h2>${title}</h2>
+          <span class="card-subtitle">${items.length ? `${items.length} scheduled` : "Keep your calendar up to date"}</span>
+        </div>
+        ${key === "timeOff" && state.user?.role === "admin" ? `<button class="btn btn-primary" type="button" id="add-leave-dashboard">Add Time Off</button>` : ""}
+      </div>
+      <div class="holiday-list">${renderLeaveRows(visibleItems) || `<p class="empty-note">${emptyText}</p>`}</div>
+      ${remaining ? `<button class="load-more-leaves" type="button" data-load-leaves="${key}">Load more <span>(${Math.min(3, remaining)})</span></button>` : ""}
+    </aside>`;
+  };
+
   return `<div class="period-tabs" role="tablist" aria-label="Select dashboard period">
           <button class="tab ${state.dashboardPeriod === "day" ? "active" : ""}" type="button" id="tab-day" data-period="day" aria-pressed="${state.dashboardPeriod === "day"}">Today</button>
           <button class="tab ${state.dashboardPeriod === "week" ? "active" : ""}" type="button" id="tab-week" data-period="week" aria-pressed="${state.dashboardPeriod === "week"}">Week</button>
@@ -277,16 +280,8 @@ function createDashboardTemplate() {
             <div class="profile-details-row"><span class="small-label">Location</span><span class="value-text">${dbLocation}</span></div>
             <div class="profile-details-row"><span class="small-label">Timezone</span><span class="value-text">${dbTimezone}</span></div>
           </section>
-          <aside class="card holidays-card">
-            <div class="card-title-row">
-              <h2>Upcoming Holidays and Time Off</h2>
-              ${state.user?.role === "admin" ? `
-              <div class="admin-inline-actions">
-                <button class="btn btn-primary" type="button" id="add-leave-dashboard">Add Time Off</button>
-              </div>` : ""}
-            </div>
-            <div class="holiday-list">${leaveRows || '<p class="empty-note">No upcoming holidays or time off scheduled.</p>'}</div>
-          </aside>
+          ${createLeaveCard("Upcoming Holidays", upcomingHolidays, holidayLimit, "holidays", "No upcoming holidays scheduled.")}
+          ${createLeaveCard("Time Off", timeOffItems, timeOffLimit, "timeOff", "No time off scheduled.")}
           ${createLeaveModalHtml()}
         </div>
         <section class="card tracked-card">
@@ -483,51 +478,6 @@ function renderDashboard() {
   });
 }
 
-function createTimesheetsTemplate() {
-  const zone = getUserTimeZone();
-  // Sort data chronologically (oldest first, newest last) for professional display
-  const sortedRows = [...state.historyData].sort((a, b) => {
-    return new Date(a.date) - new Date(b.date);
-  });
-  
-  const historyRows = sortedRows.map((day) => `
-      <tr>
-        <td>${day.date}</td>
-        <td>${day.checkInUtc ? formatTime(day.checkInUtc, zone) : "—"}</td>
-        <td>${day.checkOutUtc ? formatTime(day.checkOutUtc, zone) : "—"}</td>
-        <td>${formatDuration(day.breakSeconds)}</td>
-        <td>${formatDuration(day.workedSeconds)}</td>
-      </tr>
-    `).join("");
-  const selectedPeriod = normalizeDashboardPeriod(state.dashboardPeriod);
-  const periodDesc = selectedPeriod === "week" ? "this week" : selectedPeriod === "month" ? "this month" : "today";
-  const dayDurations = computeDurationsClient(state.todayEvents);
-  const summaryWorked = formatDuration(dayDurations.workedSeconds);
-  const summaryBreak = formatDuration(dayDurations.breakSeconds);
-  const standardSeconds = selectedPeriod === "week" ? 40 * 3600 : selectedPeriod === "month" ? 160 * 3600 : 8 * 3600;
-  const summaryOvertime = formatDuration(Math.max(0, (dayDurations.workedSeconds || 0) - standardSeconds));
-
-  return `<section class="card tracked-card">
-          <div class="card-heading"><h2>Timesheet summary</h2></div>
-          <div class="metric-panel">
-            <div class="metrics-left">
-              <div class="metric-line"><span class="metric-label">Worked ${periodDesc}</span><span class="metric-value" id="worked-value">${summaryWorked}</span></div>
-              <div class="metric-line"><span class="metric-label">Breaks ${periodDesc}</span><span class="metric-value" id="break-value">${summaryBreak}</span></div>
-              <div class="metric-line"><span class="metric-label">Overtime ${periodDesc}</span><span class="metric-value" id="overtime-value">${summaryOvertime}</span></div>
-            </div>
-          </div>
-        </section>
-        <div class="card history-card">
-          <h2>Daily timesheet history</h2>
-          <table class="history">
-            <thead><tr><th>Date</th><th>Check in (${zone})</th><th>Check out (${zone})</th><th>Break</th><th>Worked</th></tr></thead>
-            <tbody id="history-body">${historyRows}</tbody>
-          </table>
-          <p class="empty-note" id="history-empty" style="display:${state.historyData.length ? "none" : "block"};">No history yet.</p>
-        </div>
-      `;
-}
-
 function createLeaveModalHtml() {
   const isAdmin = state.user?.role === "admin";
   const dbLocation = state.user?.location || "Australia";
@@ -571,86 +521,10 @@ function createLeaveModalHtml() {
       `;
 }
 
-function createTimeOffTemplate() {
-  const isAdmin = state.user?.role === "admin";
-  const dbLocation = state.user?.location || "Australia";
-  const leaveRows = (state.leaveData || []).map((item) => {
-    const start = new Date(item.startDate);
-    const end = item.endDate ? new Date(item.endDate) : start;
-    const month = start.toLocaleString("en", { month: "short" }).toUpperCase();
-    const day = String(start.getDate()).padStart(2, "0");
-    const range = item.endDate ? `${formatDate(item.startDate, getUserTimeZone())} – ${formatDate(item.endDate, getUserTimeZone())}` : formatDate(item.startDate, getUserTimeZone());
-    // Admins see approve/reject controls; regular users can edit/delete their requests
-    const adminActions = isAdmin ? `
-      <div class="row-admin-actions">
-        ${item.status === "Pending" || item.status === "Requested" ? `
-          <button type="button" class="mini-action" data-action="approve-leave" data-id="${item.id}">Approve</button>
-          <button type="button" class="mini-action danger" data-action="reject-leave" data-id="${item.id}">Reject</button>
-        ` : ""}
-      </div>
-    ` : `
-      <div class="row-admin-actions">
-        <button type="button" class="mini-action" data-action="edit-leave" data-id="${item.id}">Edit</button>
-        <button type="button" class="mini-action danger" data-action="delete-leave" data-id="${item.id}">Delete</button>
-      </div>
-    `;
-    return `<div class="holiday-row">
-      <span class="holiday-date">${month}<br/>${day}</span>
-      <div>
-        <div class="holiday-name">${item.name || "Time off"}</div>
-        <div class="holiday-place">${item.type || "Leave"} · ${item.location || state.user?.location || "Australia"}</div>
-        <div class="holiday-meta">${range}${
-          item.reason ? ` · ${item.reason}` : ""
-        }</div>
-        <div class="holiday-status status-${item.status?.toLowerCase() || "approved"}">${item.status || "Approved"}</div>
-        ${adminActions}
-      </div>
-    </div>`;
-  }).join("");
-  return `<section class="card holidays-card">
-          <div class="card-title-row">
-            <h2>Time off requests</h2>
-            <div class="admin-inline-actions">
-              ${!isAdmin ? `<button class="btn btn-primary" type="button" id="add-leave">New Time Off Request</button>` : ''}
-              <button class="btn btn-ghost" type="button" id="refresh-leaves">↻ Refresh</button>
-            </div>
-          </div>
-          <div class="holiday-list">${leaveRows || '<p class="empty-note">No time off requests yet.</p>'}</div>
-        </section>
-        ${createLeaveModalHtml()}
-      `;
-}
-
 // Home page removed — login is now the default landing page.
 
 function renderLogin() {
-  root.innerHTML = `<div class="auth-shell">
-    <div class="auth-card">
-      <div class="auth-brand"><img src="images/t_m_logo.png" alt="Team Portal Logo" class="logo-img"/><h1>Team Portal</h1></div>
-      <p class="auth-sub">Sign in to access your attendance dashboard.</p>
-      <div class="form-error" id="form-error"></div>
-      <form id="login-form" novalidate>
-        <div class="field"><label for="username">Username</label><input id="username" name="username" type="text" autocomplete="username" required placeholder="Enter your username" /></div>
-        <div class="field"><label for="password">Password</label>
-          <div class="password-field">
-            <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Enter your password" />
-            <button class="password-toggle" id="toggle-password" type="button" aria-pressed="false" aria-label="Show password">
-              <svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
-              <svg class="eye-off-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                <line x1="1" y1="1" x2="23" y2="23"></line>
-              </svg>
-            </button>
-          </div>
-        </div>
-        <button class="btn btn-primary" type="submit" id="submit-btn">Sign in</button>
-      </form>
-      <div class="auth-switch">Need access? <strong>Contact your admin.</strong></div>
-    </div>
-  </div>`;
+  root.innerHTML = renderLoginForm();
 
   setError(state.error);
   const form = document.getElementById("login-form");
@@ -666,7 +540,8 @@ function renderLogin() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
-      state.user = data;
+      state.employee = data;
+      state.user = state.employee;
       hydrateProfileFromUser();
       setPage("dashboard");
       await loadToday();
@@ -787,162 +662,6 @@ function closeBreakReasonModal() {
   if (modal) modal.style.display = "none";
 }
 
-function renderTimesheets() {
-  root.innerHTML = createPageShell("Timesheets", createTimesheetsTemplate());
-  attachDashboardListeners();
-  updateDashboardValues();
-  renderHistory();
-}
-
-function renderTimeOff() {
-  loadLeaves().then(() => {
-    root.innerHTML = createPageShell("Time Off", createTimeOffTemplate());
-    attachDashboardListeners();
-    attachLeaveModalListeners();
-    updateDashboardValues();
-  }).catch(() => {
-    // Fallback: render with empty leaves data
-    state.leaveData = [];
-    root.innerHTML = createPageShell("Time Off", createTimeOffTemplate());
-    attachDashboardListeners();
-    attachLeaveModalListeners();
-    updateDashboardValues();
-  });
-}
-
-function renderWorkSchedules() {
-  root.innerHTML = createPageShell("Work Schedules", createWorkSchedulesTemplate());
-  attachDashboardListeners();
-  updateDashboardValues();
-}
-
-function createWorkSchedulesTemplate() {
-  const rows = (state.scheduleData || []).map((item) => `
-    <div class="schedule-row">
-      <div class="schedule-item schedule-date">
-        <strong>${item.name || "Unnamed schedule"}</strong>
-        <span>${item.date} · ${item.shift}</span>
-      </div>
-      <div class="schedule-item schedule-time">
-        <strong>${item.start} - ${item.end}</strong>
-        <span>${item.location}</span>
-      </div>
-      <div class="schedule-item schedule-owner">
-        <strong>${item.assigned}</strong>
-        <span>${item.status}</span>
-      </div>
-      <div class="schedule-item schedule-actions">
-        <button class="mini-action" type="button" data-action="edit-schedule" data-id="${item.id}">Edit</button>
-        <button class="mini-action danger" type="button" data-action="delete-schedule" data-id="${item.id}">Delete</button>
-      </div>
-    </div>
-  `).join("");
-
-  return `
-    <section class="card profile-card">
-      <div class="card-title-row">
-        <div>
-          <h2>Work schedules</h2>
-          <p>Manage employee shifts, regional schedules, and daily attendance plans.</p>
-        </div>
-        <button class="btn btn-primary" type="button" id="new-schedule">New schedule</button>
-      </div>
-      <div class="schedule-header-row">
-        <span>Name & date</span>
-        <span>Time & location</span>
-        <span>Assigned & status</span>
-        <span>Actions</span>
-      </div>
-      <div class="schedule-list">
-        ${rows}
-      </div>
-      ${rows.length === 0 ? `<p class="empty-note">No work schedules created yet.</p>` : ""}
-    </section>
-    ${createScheduleModalHtml()}
-  `;
-}
-
-function createScheduleModalHtml() {
-  return `
-    <div class="task-modal-overlay" id="schedule-modal" style="display:none;">
-      <div class="task-modal-card">
-        <div class="task-modal-header">
-          <h3 id="schedule-modal-title">New Work Schedule</h3>
-          <button class="icon-button" id="close-schedule-modal" type="button">×</button>
-        </div>
-        <form id="schedule-form">
-          <input type="hidden" id="schedule-id" />
-          <div class="form-section">
-            <h4 class="form-section-title">Schedule Details</h4>
-            <div class="form-grid">
-              <label class="field-block full-width"><span>Name <span class="required-indicator">*</span></span><input id="schedule-name" required placeholder="Enter schedule name" /></label>
-              <label class="field-block"><span>Date <span class="required-indicator">*</span></span><div class="date-time-control"><input type="date" id="schedule-date" required /></div></label>
-              <label class="field-block"><span>Shift</span><select id="schedule-shift"><option value="Morning">Morning</option><option value="Afternoon">Afternoon</option><option value="Night">Night</option></select></label>
-              <label class="field-block"><span>Start Time <span class="required-indicator">*</span></span><div class="date-time-control time-control"><input type="time" id="schedule-start" required /></div></label>
-              <label class="field-block"><span>End Time <span class="required-indicator">*</span></span><div class="date-time-control time-control"><input type="time" id="schedule-end" required /></div></label>
-            </div>
-          </div>
-          <div class="form-section">
-            <h4 class="form-section-title">Assignment & Status</h4>
-            <div class="form-grid">
-              <label class="field-block"><span>Location <span class="required-indicator">*</span></span><input id="schedule-location" required placeholder="Enter location" /></label>
-              <label class="field-block"><span>Assigned <span class="required-indicator">*</span></span><input id="schedule-assigned" required placeholder="Enter assignee name" /></label>
-              <label class="field-block"><span>Status</span><select id="schedule-status"><option value="Confirmed">Confirmed</option><option value="Planned">Planned</option><option value="Pending">Pending</option><option value="Blocked">Blocked</option></select></label>
-            </div>
-          </div>
-          <div class="modal-actions">
-            <button class="btn btn-ghost" type="button" id="cancel-schedule">Cancel</button>
-            <button class="btn btn-primary" type="submit">Save Schedule</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  `;
-}
-
-function openScheduleModal(schedule = null) {
-  const modal = document.getElementById("schedule-modal");
-  const titleEl = document.getElementById("schedule-modal-title");
-  const formId = document.getElementById("schedule-id");
-  const dateInput = document.getElementById("schedule-date");
-  const shiftInput = document.getElementById("schedule-shift");
-  const startInput = document.getElementById("schedule-start");
-  const endInput = document.getElementById("schedule-end");
-  const nameInput = document.getElementById("schedule-name");
-  const locationInput = document.getElementById("schedule-location");
-  const assignedInput = document.getElementById("schedule-assigned");
-  const statusInput = document.getElementById("schedule-status");
-
-  if (!modal || !titleEl || !formId || !dateInput || !shiftInput || !startInput || !endInput || !nameInput || !locationInput || !assignedInput || !statusInput) return;
-
-  titleEl.textContent = schedule ? "Edit Work Schedule" : "New Work Schedule";
-  formId.value = schedule?.id || "";
-  const now = new Date();
-  const localDate = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
-  const localTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  const endTimeDate = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-  const defaultEndTime = `${String(endTimeDate.getHours()).padStart(2, "0")}:${String(endTimeDate.getMinutes()).padStart(2, "0")}`;
-
-  dateInput.value = schedule?.date || localDate;
-  shiftInput.value = schedule?.shift || "Morning";
-  startInput.value = schedule?.start || localTime;
-  endInput.value = schedule?.end || defaultEndTime;
-  nameInput.value = schedule?.name || "";
-  locationInput.value = schedule?.location || "";
-  assignedInput.value = schedule?.assigned || schedule?.owner || "";
-  statusInput.value = schedule?.status || "Confirmed";
-
-  modal.style.display = "flex";
-  
-  // Focus on date input for better UX
-  setTimeout(() => dateInput.focus(), 100);
-}
-
-function closeScheduleModal() {
-  const modal = document.getElementById("schedule-modal");
-  if (modal) modal.style.display = "none";
-}
-
 function attachDashboardListeners() {
   const navLinks = document.querySelectorAll(".nav-title[data-page]");
   for (const link of navLinks) {
@@ -962,6 +681,7 @@ function attachDashboardListeners() {
       } catch (err) {
         console.error("Logout API failed.", err);
       } finally {
+        state.employee = null;
         state.user = null;
         state.status = "not_checked_in";
         state.todayEvents = [];
@@ -1313,6 +1033,16 @@ function attachDashboardListeners() {
       }
     }
   }
+
+  const loadMoreLeaveButtons = document.querySelectorAll("[data-load-leaves]");
+  for (const button of loadMoreLeaveButtons) {
+    button.addEventListener("click", () => {
+      const key = button.dataset.loadLeaves;
+      if (!key) return;
+      state.dashboardLeaveLimits[key] = (state.dashboardLeaveLimits[key] || 3) + 3;
+      renderDashboard();
+    });
+  }
 }
 
 function updateDashboardValues() {
@@ -1639,13 +1369,13 @@ async function captureLocation() {
   return { latitude: coords.latitude, longitude: coords.longitude, address };
 }
 
-function createUserManagementTemplate() {
-  const users = state.users || [];
+function createEmployeeManagementTemplate() {
+  const users = state.employees || state.users || [];
   const userRows = users.map((user) => `
     <tr>
       <td>${user.fullName || "—"}</td>
       <td>${user.username || "—"}</td>
-      <td><span class="badge role-badge role-${user.role || "employee"}">${user.role || "employee"}</span></td>
+      <td><span class="badge role-badge role-${user.role === "user" ? "employee" : (user.role || "employee")}">${user.role === "user" ? "employee" : (user.role || "employee")}</span></td>
       <td>${user.location || "—"}</td>
       <td>${user.timezone || "—"}</td>
       <td>${user.dailyBreakAllowanceMinutes || 60} min</td>
@@ -1681,7 +1411,7 @@ function createUserManagementTemplate() {
           </div>
         </section>
         <div class="task-modal-overlay" id="user-modal" style="display:none;">
-          <div class="task-modal-card">
+          <div class="task-modal-card employee-modal-card">
             <div class="task-modal-header">
               <h3 id="user-modal-title">Create New Employee</h3>
               <button class="icon-button" id="close-user-modal" type="button">×</button>
@@ -1749,14 +1479,14 @@ function createUserManagementTemplate() {
       `;
 }
 
-function renderUserManagement() {
-  loadUsers().then(() => {
-    root.innerHTML = createPageShell("Employee Management", createUserManagementTemplate());
+function renderEmployeeManagement() {
+  loadEmployees().then(() => {
+    root.innerHTML = createPageShell("Employee Management", createEmployeeManagementTemplate());
     attachDashboardListeners();
     updateUserManagementListeners();
   }).catch(() => {
     state.users = [];
-    root.innerHTML = createPageShell("Employee Management", createUserManagementTemplate());
+    root.innerHTML = createPageShell("Employee Management", createEmployeeManagementTemplate());
     attachDashboardListeners();
     updateUserManagementListeners();
   });
@@ -1771,8 +1501,8 @@ function updateUserManagementListeners() {
   const refreshButton = document.getElementById("refresh-users");
   if (refreshButton) {
     refreshButton.addEventListener("click", async () => {
-      await loadUsers();
-      if (state.page === "user-management") renderUserManagement();
+      await loadEmployees();
+      if (state.page === "user-management") renderEmployeeManagement();
     });
   }
 
@@ -1800,10 +1530,10 @@ function updateUserManagementListeners() {
       }
 
       try {
-        await updateUserBreakAllowance(userId, dailyBreakAllowanceMinutes);
-        await loadUsers();
+        await updateEmployeeBreakAllowance(userId, dailyBreakAllowanceMinutes);
+        await loadEmployees();
         closeBreakAllowanceModal();
-        if (state.page === "user-management") renderUserManagement();
+        if (state.page === "user-management") renderEmployeeManagement();
       } catch (error) {
         console.error("Failed to update break allowance:", error);
         alert(error.error || "Failed to update break allowance. Please try again.");
@@ -1848,12 +1578,12 @@ function updateUserManagementListeners() {
       }
 
       try {
-        await createUser(payload);
-        await loadUsers();
+        await createEmployee(payload);
+        await loadEmployees();
         closeUserModal();
-        if (state.page === "user-management") renderUserManagement();
+        if (state.page === "user-management") renderEmployeeManagement();
       } catch (error) {
-        console.error("Failed to create user:", error);
+        console.error("Failed to create employee:", error);
         alert(error.error || "Failed to create employee. Please try again.");
       }
     });

@@ -26,21 +26,26 @@ function sanitizeTask(task) {
 }
 
 async function attachNames(tasks) {
-  const users = await db.getUsers();
+  const employees = await db.getEmployees();
   const projects = await db.getProjects();
-  const userById = new Map(users.map((u) => [u.id, u.fullName]));
+  const employeeById = new Map(employees.map((employee) => [employee.id, employee.fullName]));
   const projectById = new Map(projects.map((p) => [p.id, p.name]));
   return tasks.map((task) => ({
     ...task,
-    assigneeName: task.assigneeId ? userById.get(task.assigneeId) || "Unknown" : "Unassigned",
-    creatorName: task.creatorId ? userById.get(task.creatorId) || "Unknown" : "Unknown",
+    assigneeName: task.assigneeId ? employeeById.get(task.assigneeId) || "Unknown" : "Unassigned",
+    creatorName: task.creatorId ? employeeById.get(task.creatorId) || "Unknown" : "Unknown",
     projectName: task.projectId ? projectById.get(task.projectId) || "General" : "General",
   }));
 }
 
+router.get("/employees", async (req, res) => {
+  const employees = await db.getEmployees();
+  res.json({ employees: employees.map((employee) => ({ id: employee.id, fullName: employee.fullName, role: employee.role, location: employee.location, timezone: employee.timezone, dailyBreakAllowanceMinutes: employee.dailyBreakAllowanceMinutes || 60 })) });
+});
+
 router.get("/users", async (req, res) => {
-  const users = await db.getUsers();
-  res.json({ users: users.map((user) => ({ id: user.id, fullName: user.fullName, role: user.role, location: user.location, timezone: user.timezone, dailyBreakAllowanceMinutes: user.dailyBreakAllowanceMinutes || 60 })) });
+  const employees = await db.getEmployees();
+  res.json({ users: employees.map((employee) => ({ id: employee.id, fullName: employee.fullName, role: employee.role, location: employee.location, timezone: employee.timezone, dailyBreakAllowanceMinutes: employee.dailyBreakAllowanceMinutes || 60 })) });
 });
 
 router.get("/projects", async (req, res) => {
@@ -49,9 +54,9 @@ router.get("/projects", async (req, res) => {
 });
 
 router.post("/projects", async (req, res) => {
-  const user = await db.findUserById(req.session.userId);
-  if (!user) return res.status(401).json({ error: "Not signed in." });
-  if (user.role !== "admin") return res.status(403).json({ error: "Only admins can create projects." });
+  const employee = await db.findEmployeeById(req.session.employeeId || req.session.userId);
+  if (!employee) return res.status(401).json({ error: "Not signed in." });
+  if (employee.role !== "admin") return res.status(403).json({ error: "Only admins can create projects." });
 
   const { name, clientName, managerName, description, stack, location } = req.body || {};
   if (!name) return res.status(400).json({ error: "Project name is required." });
@@ -67,21 +72,21 @@ router.post("/projects", async (req, res) => {
     description: description || "",
     stack,
     location,
-    ownerId: user.id,
+    ownerId: employee.id,
   });
 
   res.json({ project });
 });
 
 router.get("/", async (req, res) => {
-  const user = await db.findUserById(req.session.userId);
+  const employee = await db.findEmployeeById(req.session.employeeId || req.session.userId);
   const statusFilter = req.query.status ? String(req.query.status).trim() : null;
   const projectFilter = req.query.projectId ? String(req.query.projectId).trim() : null;
   const assigneeFilter = req.query.assigneeId ? String(req.query.assigneeId).trim() : null;
 
   let assigneeId = null;
-  if (user.role !== "admin") {
-    assigneeId = user.id;
+  if (employee.role !== "admin") {
+    assigneeId = employee.id;
   } else if (assigneeFilter) {
     assigneeId = assigneeFilter;
   }
@@ -92,8 +97,8 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const user = await db.findUserById(req.session.userId);
-  if (!user) return res.status(401).json({ error: "Not signed in." });
+  const employee = await db.findEmployeeById(req.session.employeeId || req.session.userId);
+  if (!employee) return res.status(401).json({ error: "Not signed in." });
 
   const { title, description, projectId, assigneeId, dueDate, priority } = req.body || {};
   if (!title) return res.status(400).json({ error: "Task title is required." });
@@ -104,7 +109,7 @@ router.post("/", async (req, res) => {
     projectId: projectId || null,
     status: "Backlog",
     assigneeId: assigneeId || null,
-    creatorId: user.id,
+    creatorId: employee.id,
     priority: priority || "Normal",
     dueDate: dueDate || null,
     comments: [],
@@ -115,8 +120,8 @@ router.post("/", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
-  const user = await db.findUserById(req.session.userId);
-  if (!user) return res.status(401).json({ error: "Not signed in." });
+  const employee = await db.findEmployeeById(req.session.employeeId || req.session.userId);
+  if (!employee) return res.status(401).json({ error: "Not signed in." });
 
   const updates = {};
   const { title, description, status, assigneeId, dueDate, projectId, priority } = req.body || {};
@@ -143,8 +148,8 @@ router.get("/:id", async (req, res) => {
 });
 
 router.post("/:id/comments", async (req, res) => {
-  const user = await db.findUserById(req.session.userId);
-  if (!user) return res.status(401).json({ error: "Not signed in." });
+  const employee = await db.findEmployeeById(req.session.employeeId || req.session.userId);
+  if (!employee) return res.status(401).json({ error: "Not signed in." });
 
   const { message } = req.body || {};
   if (!message || !String(message).trim()) {
@@ -153,8 +158,8 @@ router.post("/:id/comments", async (req, res) => {
 
   const comment = {
     id: new Date().getTime().toString(36),
-    authorId: user.id,
-    authorName: user.fullName,
+    authorId: employee.id,
+    authorName: employee.fullName,
     message: String(message).trim(),
     createdAt: new Date().toISOString(),
   };
@@ -166,8 +171,8 @@ router.post("/:id/comments", async (req, res) => {
 });
 
 router.post("/:id/attachments", async (req, res) => {
-  const user = await db.findUserById(req.session.userId);
-  if (!user) return res.status(401).json({ error: "Not signed in." });
+  const employee = await db.findEmployeeById(req.session.employeeId || req.session.userId);
+  if (!employee) return res.status(401).json({ error: "Not signed in." });
 
   const { name, url, fileName, contentType, contentBase64 } = req.body || {};
   if (!name || !String(name).trim()) {
@@ -181,8 +186,8 @@ router.post("/:id/attachments", async (req, res) => {
     fileName: fileName ? String(fileName).trim() : null,
     contentType: contentType ? String(contentType).trim() : null,
     contentBase64: contentBase64 ? String(contentBase64).trim() : null,
-    authorId: user.id,
-    authorName: user.fullName,
+    authorId: employee.id,
+    authorName: employee.fullName,
     createdAt: new Date().toISOString(),
   };
 

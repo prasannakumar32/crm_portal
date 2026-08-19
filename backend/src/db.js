@@ -3,33 +3,48 @@
 const { getDb } = require("./mongo");
 const { ObjectId } = require("mongodb");
 
-async function getUsers() {
-  const db = await getDb();
-  const users = await db.collection("users").find({}).toArray();
-  return users.map((u) => ({ ...u, role: u.role === "user" ? "employee" : u.role, id: u._id.toString() }));
+function getEmployeeCollections(db) {
+  return [db.collection("employees"), db.collection("users")];
 }
 
-async function findUserByUsername(username) {
+function normalizeEmployee(employee) {
+  if (!employee) return null;
+  return { ...employee, role: employee.role === "user" ? "employee" : employee.role, id: employee._id.toString() };
+}
+
+async function getEmployees() {
+  const db = await getDb();
+  const collections = getEmployeeCollections(db);
+  const records = (await Promise.all(collections.map((collection) => collection.find({}).toArray()))).flat();
+  const unique = new Map(records.map((employee) => [employee._id.toString(), employee]));
+  return [...unique.values()].map(normalizeEmployee);
+}
+
+async function findEmployeeByUsername(username) {
   const db = await getDb();
   const needle = username.trim().toLowerCase();
-  const user = await db.collection("users").findOne({ normalizedUsername: needle });
-  if (!user) return null;
-  return { ...user, role: user.role === "user" ? "employee" : user.role, id: user._id.toString() };
+  for (const employees of getEmployeeCollections(db)) {
+    const employee = await employees.findOne({ normalizedUsername: needle });
+    if (employee) return normalizeEmployee(employee);
+  }
+  return null;
 }
 
-async function findUserById(id) {
+async function findEmployeeById(id) {
   if (!id) return null;
   const db = await getDb();
   try {
-    const user = await db.collection("users").findOne({ _id: new ObjectId(id) });
-    if (!user) return null;
-    return { ...user, role: user.role === "user" ? "employee" : user.role, id: user._id.toString() };
+    for (const employees of getEmployeeCollections(db)) {
+      const employee = await employees.findOne({ _id: new ObjectId(id) });
+      if (employee) return normalizeEmployee(employee);
+    }
+    return null;
   } catch (err) {
     return null;
   }
 }
 
-async function createUser({ username, passwordHash, fullName, role = "employee", location = null, timezone = null, dailyBreakAllowanceMinutes = 60 }) {
+async function createEmployee({ username, passwordHash, fullName, role = "employee", location = null, timezone = null, dailyBreakAllowanceMinutes = 60 }) {
   const db = await getDb();
   const normalizedUsername = username.trim().toLowerCase();
   const doc = {
@@ -43,9 +58,9 @@ async function createUser({ username, passwordHash, fullName, role = "employee",
     dailyBreakAllowanceMinutes: dailyBreakAllowanceMinutes || 60,
     createdAt: new Date().toISOString(),
   };
-  const r = await db.collection("users").insertOne(doc);
-  const user = await db.collection("users").findOne({ _id: r.insertedId });
-  return { ...user, id: user._id.toString() };
+  const employees = db.collection("employees");
+  const r = await employees.insertOne(doc);
+  return normalizeEmployee(await employees.findOne({ _id: r.insertedId }));
 }
 
 async function getAllEvents() {
@@ -54,17 +69,17 @@ async function getAllEvents() {
   return events.map((e) => ({ ...e, id: e._id.toString() }));
 }
 
-async function getEventsForUser(userId) {
+async function getEventsForEmployee(employeeId) {
   const db = await getDb();
-  const uid = String(userId);
-  const events = await db.collection("attendance").find({ userId: uid }).sort({ timestampUtc: 1 }).toArray();
+  const uid = String(employeeId);
+  const events = await db.collection("attendance").find({ $or: [{ employeeId: uid }, { userId: uid }] }).sort({ timestampUtc: 1 }).toArray();
   return events.map((e) => ({ ...e, id: e._id.toString() }));
 }
 
-async function addEvent({ userId, type, latitude, longitude, address, reason }) {
+async function addEvent({ employeeId, type, latitude, longitude, address, reason }) {
   const db = await getDb();
   const event = {
-    userId: String(userId),
+    employeeId: String(employeeId),
     type,
     timestampUtc: new Date().toISOString(),
     latitude: typeof latitude === "number" ? latitude : null,
@@ -252,28 +267,30 @@ async function deleteLeave(id) {
   }
 }
 
-async function updateUserBreakAllowance(userId, dailyBreakAllowanceMinutes) {
+async function updateEmployeeBreakAllowance(employeeId, dailyBreakAllowanceMinutes) {
   const db = await getDb();
   try {
-    const result = await db.collection("users").findOneAndUpdate(
-      { _id: new ObjectId(userId) },
-      { $set: { dailyBreakAllowanceMinutes, updatedAt: new Date().toISOString() } },
-      { returnDocument: "after" }
-    );
-    if (!result.value) return null;
-    return { ...result.value, id: result.value._id.toString() };
+    for (const employees of getEmployeeCollections(db)) {
+      const result = await employees.findOneAndUpdate(
+        { _id: new ObjectId(employeeId) },
+        { $set: { dailyBreakAllowanceMinutes, updatedAt: new Date().toISOString() } },
+        { returnDocument: "after" }
+      );
+      if (result.value) return normalizeEmployee(result.value);
+    }
+    return null;
   } catch (err) {
     return null;
   }
 }
 
 module.exports = {
-  getUsers,
-  findUserByUsername,
-  findUserById,
-  createUser,
+  getEmployees,
+  findEmployeeByUsername,
+  findEmployeeById,
+  createEmployee,
   getAllEvents,
-  getEventsForUser,
+  getEventsForEmployee,
   addEvent,
   getProjects,
   createProject,
@@ -287,5 +304,5 @@ module.exports = {
   createLeave,
   updateLeave,
   deleteLeave,
-  updateUserBreakAllowance,
+  updateEmployeeBreakAllowance,
 };
