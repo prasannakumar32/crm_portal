@@ -1110,9 +1110,10 @@ async function performAction(endpoint, extraPayload = {}) {
     });
     state.status = data.status;
     state.todayEvents = data.today;
-    if (data.breakAllowance) {
-      state.breakAllowance = data.breakAllowance;
-    }
+    // Break allowance is temporarily disabled.
+    // if (data.breakAllowance) {
+    //   state.breakAllowance = data.breakAllowance;
+    // }
     updateDashboardValues();
     await loadHistory();
   } catch (err) {
@@ -1324,9 +1325,10 @@ function createEmployeeManagementTemplate() {
       <td><span class="badge role-badge role-${user.role === "user" ? "employee" : (user.role || "employee")}">${user.role === "user" ? "employee" : (user.role || "employee")}</span></td>
       <td>${user.location || "—"}</td>
       <td>${user.timezone || "—"}</td>
-      <td>${user.dailyBreakAllowanceMinutes || 60} min</td>
       <td>
+        <!-- Break allowance is temporarily disabled. Restore this button later when needed.
         <button type="button" class="mini-action" data-action="edit-break-allowance" data-id="${user.id}" data-break-allowance="${user.dailyBreakAllowanceMinutes || 60}">Edit Break</button>
+        -->
       </td>
     </tr>
   `).join("");
@@ -1348,57 +1350,14 @@ function createEmployeeManagementTemplate() {
                   <th>Role</th>
                   <th>Location</th>
                   <th>Timezone</th>
-                  <th>Daily Break Allowance</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody id="users-body">${userRows || '<tr><td colspan="7" class="empty-note">No employees found. Create the first employee to get started.</td></tr>'}</tbody>
+              <tbody id="users-body">${userRows || '<tr><td colspan="6" class="empty-note">No employees found. Create the first employee to get started.</td></tr>'}</tbody>
             </table>
           </div>
         </section>
-        <div class="task-modal-overlay" id="user-modal" style="display:none;">
-          <div class="task-modal-card employee-modal-card">
-            <div class="task-modal-header">
-              <h3 id="user-modal-title">Create New Employee</h3>
-              <button class="icon-button" id="close-user-modal" type="button">×</button>
-            </div>
-            <form id="user-form">
-              <div class="form-section">
-                <h4 class="form-section-title">Employee Information</h4>
-                <div class="form-grid">
-                  <label class="field-block full-width"><span>Full Name <span class="required-indicator">*</span></span><input id="user-fullname" required placeholder="Enter full name" /></label>
-                  <label class="field-block"><span>Username <span class="required-indicator">*</span></span><input id="user-username" required placeholder="Enter username (3-32 characters)" /></label>
-                  <label class="field-block"><span>Password <span class="required-indicator">*</span></span><input id="user-password" type="password" required placeholder="Enter password (min 8 characters)" /></label>
-                </div>
-              </div>
-              <div class="form-section">
-                <h4 class="form-section-title">Role & Location</h4>
-                <div class="form-grid">
-                  <label class="field-block"><span>Role</span><select id="user-role"><option value="employee">Employee</option><option value="admin">Admin</option></select></label>
-                  <label class="field-block"><span>Location</span><input id="user-location" placeholder="e.g., Australia, India" /></label>
-                  <label class="field-block"><span>Timezone</span><select id="user-timezone">
-                    <option value="">Select timezone</option>
-                    <option value="Australia/Sydney">Australia/Sydney (AEST)</option>
-                    <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
-                    <option value="UTC">UTC</option>
-                  </select></label>
-                </div>
-              </div>
-              <div class="form-section">
-                <h4 class="form-section-title">Break Time Settings</h4>
-                <div class="form-grid">
-                  <label class="field-block"><span>Daily Break Allowance (minutes)</span><input id="user-break-allowance" type="number" min="0" max="480" value="60" placeholder="60" /></label>
-                </div>
-              </div>
-              <div class="form-section">
-                <div class="form-grid form-actions-grid">
-                  <button class="btn btn-ghost" type="button" id="cancel-user">Cancel</button>
-                  <button class="btn btn-primary" type="submit" id="submit-user">Create Employee</button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
+        <!-- Break allowance form is temporarily disabled. Restore this block when needed.
         <div class="task-modal-overlay" id="break-allowance-modal" style="display:none;">
           <div class="task-modal-card">
             <div class="task-modal-header">
@@ -1422,6 +1381,7 @@ function createEmployeeManagementTemplate() {
             </form>
           </div>
         </div>
+        -->
       `;
 }
 
@@ -1452,57 +1412,37 @@ function updateUserManagementListeners() {
     });
   }
 
-  // Break allowance edit buttons
-  const editBreakButtons = document.querySelectorAll("[data-action='edit-break-allowance']");
-  for (const btn of editBreakButtons) {
-    btn.addEventListener("click", () => {
-      const userId = btn.dataset.id;
-      const currentAllowance = btn.dataset.breakAllowance || 60;
-      openBreakAllowanceModal(userId, currentAllowance);
-    });
-  }
-
-  // Break allowance form
-  const breakAllowanceForm = document.getElementById("break-allowance-form");
-  if (breakAllowanceForm) {
-    breakAllowanceForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const userId = document.getElementById("break-allowance-user-id").value;
-      const dailyBreakAllowanceMinutes = parseInt(document.getElementById("break-allowance-minutes").value) || 60;
-
-      if (!userId) {
-        alert("Employee ID is required.");
-        return;
-      }
-
-      try {
-        await updateEmployeeBreakAllowance(userId, dailyBreakAllowanceMinutes);
-        await loadEmployees();
-        closeBreakAllowanceModal();
-        if (state.page === "user-management") renderEmployeeManagement();
-      } catch (error) {
-        console.error("Failed to update break allowance:", error);
-        alert(error.error || "Failed to update break allowance. Please try again.");
-      }
-    });
-  }
-
-  const cancelBreakAllowanceButton = document.getElementById("cancel-break-allowance");
-  if (cancelBreakAllowanceButton) {
-    cancelBreakAllowanceButton.addEventListener("click", closeBreakAllowanceModal);
-  }
-
-  const closeBreakAllowanceModalButton = document.getElementById("close-break-allowance-modal");
-  if (closeBreakAllowanceModalButton) {
-    closeBreakAllowanceModalButton.addEventListener("click", closeBreakAllowanceModal);
-  }
-
-  const breakAllowanceModalOverlay = document.getElementById("break-allowance-modal");
-  if (breakAllowanceModalOverlay) {
-    breakAllowanceModalOverlay.addEventListener("click", (event) => {
-      if (event.target === breakAllowanceModalOverlay) closeBreakAllowanceModal();
-    });
-  }
+  // Break allowance is temporarily disabled.
+  // Re-enable later by restoring the edit buttons, modal markup, and submit handler.
+  // const editBreakButtons = document.querySelectorAll("[data-action='edit-break-allowance']");
+  // for (const btn of editBreakButtons) {
+  //   btn.addEventListener("click", () => {
+  //     const userId = btn.dataset.id;
+  //     const currentAllowance = btn.dataset.breakAllowance || 60;
+  //     openBreakAllowanceModal(userId, currentAllowance);
+  //   });
+  // }
+  // const breakAllowanceForm = document.getElementById("break-allowance-form");
+  // if (breakAllowanceForm) {
+  //   breakAllowanceForm.addEventListener("submit", async (event) => {
+  //     event.preventDefault();
+  //     const userId = document.getElementById("break-allowance-user-id").value;
+  //     const dailyBreakAllowanceMinutes = parseInt(document.getElementById("break-allowance-minutes").value) || 60;
+  //     if (!userId) {
+  //       alert("Employee ID is required.");
+  //       return;
+  //     }
+  //     try {
+  //       await updateEmployeeBreakAllowance(userId, dailyBreakAllowanceMinutes);
+  //       await loadEmployees();
+  //       closeBreakAllowanceModal();
+  //       if (state.page === "user-management") renderEmployeeManagement();
+  //     } catch (error) {
+  //       console.error("Failed to update break allowance:", error);
+  //       alert(error.error || "Failed to update break allowance. Please try again.");
+  //     }
+  //   });
+  // }
 
   const userForm = document.getElementById("user-form");
   if (userForm) {
@@ -1577,24 +1517,26 @@ function openUserModal() {
   setTimeout(() => fullnameInput.focus(), 100);
 }
 
-function openBreakAllowanceModal(userId, currentAllowance) {
-  const modal = document.getElementById("break-allowance-modal");
-  if (!modal) return;
-
-  const userIdInput = document.getElementById("break-allowance-user-id");
-  const allowanceInput = document.getElementById("break-allowance-minutes");
-
-  if (userIdInput) userIdInput.value = userId;
-  if (allowanceInput) allowanceInput.value = currentAllowance || 60;
-
-  modal.style.display = "flex";
-  setTimeout(() => allowanceInput.focus(), 100);
-}
-
-function closeBreakAllowanceModal() {
-  const modal = document.getElementById("break-allowance-modal");
-  if (modal) modal.style.display = "none";
-}
+// Break allowance modal helpers are temporarily disabled.
+// Re-enable these later when the feature is needed again.
+// function openBreakAllowanceModal(userId, currentAllowance) {
+//   const modal = document.getElementById("break-allowance-modal");
+//   if (!modal) return;
+//
+//   const userIdInput = document.getElementById("break-allowance-user-id");
+//   const allowanceInput = document.getElementById("break-allowance-minutes");
+//
+//   if (userIdInput) userIdInput.value = userId;
+//   if (allowanceInput) allowanceInput.value = currentAllowance || 60;
+//
+//   modal.style.display = "flex";
+//   setTimeout(() => allowanceInput.focus(), 100);
+// }
+//
+// function closeBreakAllowanceModal() {
+//   const modal = document.getElementById("break-allowance-modal");
+//   if (modal) modal.style.display = "none";
+// }
 
 function closeUserModal() {
   const modal = document.getElementById("user-modal");

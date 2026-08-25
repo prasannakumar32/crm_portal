@@ -100,11 +100,9 @@ const state = {
   holidaySource: "calendar",
   locationLabel: "Locating…",
   clock: new Date(),
-  breakAllowance: {
-    dailyBreakAllowanceMinutes: 60,
-    usedBreakMinutes: 0,
-    remainingBreakMinutes: 60,
-  },
+  // Break allowance is temporarily disabled.
+  // Restore this block later when the feature is needed again.
+  breakAllowance: null,
 };
 
 function formatTime(iso, timeZone) {

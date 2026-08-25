@@ -62,9 +62,13 @@ async function loadToday() {
   const data = await apiJson("/api/attendance/today");
   state.status = data.status;
   state.todayEvents = data.today;
-  if (data.breakAllowance) {
-    state.breakAllowance = data.breakAllowance;
-  }
+
+  // Break allowance is temporarily disabled.
+  // Re-enable later by restoring the relevant state and UI logic.
+  // if (data.breakAllowance) {
+  //   state.breakAllowance = data.breakAllowance;
+  // }
+
   updateDashboardValues();
 }
 
@@ -207,11 +211,13 @@ async function loadEmployees() {
   }
 }
 
-async function updateEmployeeBreakAllowance(employeeId, dailyBreakAllowanceMinutes) {
-  if (!employeeId || dailyBreakAllowanceMinutes === undefined) return null;
-  return apiJson(`/api/auth/employees/${employeeId}/break-allowance`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ dailyBreakAllowanceMinutes }),
-  });
-}
+// Break allowance API is temporarily disabled.
+// Re-enable this later when the business requirement comes back.
+// async function updateEmployeeBreakAllowance(employeeId, dailyBreakAllowanceMinutes) {
+//   if (!employeeId || dailyBreakAllowanceMinutes === undefined) return null;
+//   return apiJson(`/api/auth/employees/${employeeId}/break-allowance`, {
+//     method: "PUT",
+//     headers: { "Content-Type": "application/json" },
+//     body: JSON.stringify({ dailyBreakAllowanceMinutes }),
+//   });
+// }
