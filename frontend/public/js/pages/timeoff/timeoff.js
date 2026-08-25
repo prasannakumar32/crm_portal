@@ -1,7 +1,9 @@
 function createTimeOffTemplate() {
   const isAdmin = state.user?.role === "admin";
   const dbLocation = state.user?.location || "Australia";
-  const leaveRows = (state.leaveData || []).map((item) => {
+  const leaveRows = (state.leaveData || [])
+    .filter((item) => String(item.type || "").toLowerCase() !== "holiday")
+    .map((item) => {
     const start = new Date(item.startDate);
     const month = start.toLocaleString("en", { month: "short" }).toUpperCase();
     const day = String(start.getDate()).padStart(2, "0");
@@ -29,13 +31,13 @@ function createTimeOffTemplate() {
         ${adminActions}
       </div>
     </div>`;
-  }).join("");
+    }).join("");
 
   return `<section class="card holidays-card">
     <div class="card-title-row">
       <h2>Leave requests</h2>
       <div class="admin-inline-actions">
-        ${!isAdmin ? `<button class="btn btn-primary" type="button" id="add-leave">New Leave Request</button>` : ""}
+        <button class="btn btn-primary" type="button" id="add-leave">New Leave Request</button>
         <button class="btn btn-ghost" type="button" id="refresh-leaves">↻ Refresh</button>
       </div>
     </div>

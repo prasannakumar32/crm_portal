@@ -76,12 +76,12 @@ async function getEventsForEmployee(employeeId) {
   return events.map((e) => ({ ...e, id: e._id.toString() }));
 }
 
-async function addEvent({ employeeId, type, latitude, longitude, address, reason }) {
+async function addEvent({ employeeId, type, timestampUtc, latitude, longitude, address, reason }) {
   const db = await getDb();
   const event = {
     employeeId: String(employeeId),
     type,
-    timestampUtc: new Date().toISOString(),
+    timestampUtc,
     latitude: typeof latitude === "number" ? latitude : null,
     longitude: typeof longitude === "number" ? longitude : null,
     address: address || null,
@@ -90,6 +90,40 @@ async function addEvent({ employeeId, type, latitude, longitude, address, reason
   const r = await db.collection("attendance").insertOne(event);
   const e = await db.collection("attendance").findOne({ _id: r.insertedId });
   return { ...e, id: e._id.toString() };
+}
+
+async function updateAttendanceEvent(employeeId, eventId, { timestampUtc, reason }) {
+  const db = await getDb();
+  let objectId;
+  try {
+    objectId = new ObjectId(eventId);
+  } catch {
+    return null;
+  }
+
+  const result = await db.collection("attendance").updateOne(
+    { _id: objectId, $or: [{ employeeId: String(employeeId) }, { userId: String(employeeId) }] },
+    { $set: { timestampUtc, reason: typeof reason === "string" ? reason.trim().slice(0, 200) || null : null, updatedAt: new Date().toISOString() } }
+  );
+  if (!result.matchedCount) return null;
+  const event = await db.collection("attendance").findOne({ _id: objectId });
+  return { ...event, id: event._id.toString() };
+}
+
+async function deleteAttendanceEvent(employeeId, eventId) {
+  const db = await getDb();
+  let objectId;
+  try {
+    objectId = new ObjectId(eventId);
+  } catch {
+    return false;
+  }
+
+  const result = await db.collection("attendance").deleteOne({
+    _id: objectId,
+    $or: [{ employeeId: String(employeeId) }, { userId: String(employeeId) }],
+  });
+  return result.deletedCount > 0;
 }
 
 async function getProjects() {
@@ -292,6 +326,8 @@ module.exports = {
   getAllEvents,
   getEventsForEmployee,
   addEvent,
+  updateAttendanceEvent,
+  deleteAttendanceEvent,
   getProjects,
   createProject,
   getTasks,

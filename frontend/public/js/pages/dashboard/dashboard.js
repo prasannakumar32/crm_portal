@@ -164,32 +164,6 @@ function createPageShell(title, contentHtml) {
           <span class="login-time" id="login-time-label">Logged in for ${loggedInDisplay}</span>
           <span class="user-chip">Signed in as <strong>${state.user.fullName}</strong></span>
           <span class="badge location-badge">${dbLocation} · ${zoneAbbr}</span>
-          <span class="header-icon-actions">
-            <button class="icon-action-button btn-checkin small" id="btn-check-in" type="button" data-action="check-in">
-              <span class="icon-button-stack">
-                <span class="icon-symbol">✓</span>
-                <span class="icon-text">Check in</span>
-              </span>
-            </button>
-            <button class="icon-action-button btn-break small" id="btn-break-start" type="button" data-action="break-start">
-              <span class="icon-button-stack">
-                <span class="icon-symbol">☕</span>
-                <span class="icon-text">Start break</span>
-              </span>
-            </button>
-            <button class="icon-action-button btn-break small" id="btn-break-end" type="button" data-action="break-end">
-              <span class="icon-button-stack">
-                <span class="icon-symbol">↺</span>
-                <span class="icon-text">End break</span>
-              </span>
-            </button>
-            <button class="icon-action-button btn-checkout small" id="btn-check-out" type="button" data-action="check-out">
-              <span class="icon-button-stack">
-                <span class="icon-symbol">×</span>
-                <span class="icon-text">Check out</span>
-              </span>
-            </button>
-          </span>
         </div>
       </header>
       <section class="content-panel dashboard-frame">
@@ -223,11 +197,6 @@ function createDashboardTemplate() {
   const overtimeLabel = `Overtime ${periodDesc}`;
   const heroSubtext = `Here's your dashboard for ${periodDesc}.`;
 
-  // Break allowance display
-  const breakAllowance = state.breakAllowance || { dailyBreakAllowanceMinutes: 60, usedBreakMinutes: 0, remainingBreakMinutes: 60 };
-  const breakAllowancePercent = Math.min(100, Math.round((breakAllowance.usedBreakMinutes / breakAllowance.dailyBreakAllowanceMinutes) * 100));
-  const breakAllowanceStatus = breakAllowance.remainingBreakMinutes <= 0 ? 'exceeded' : breakAllowance.remainingBreakMinutes <= 15 ? 'warning' : 'ok';
-
   const renderLeaveRows = (items) => items.map((item) => {
     const start = new Date(item.startDate);
     const month = start.toLocaleString("en", { month: "short" }).toUpperCase();
@@ -253,7 +222,9 @@ function createDashboardTemplate() {
   }).join("");
 
   const renderPublicHolidayRows = (items) => items.map((item) => {
-    const date = new Date(`${item.date}T00:00:00Z`);
+    const dateText = String(item.date || item.startDate || "").trim().slice(0, 10);
+    const date = new Date(`${dateText}T00:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText) || Number.isNaN(date.getTime())) return "";
     const month = new Intl.DateTimeFormat("en", { month: "short", timeZone: "UTC" }).format(date).toUpperCase();
     const day = new Intl.DateTimeFormat("en", { day: "2-digit", timeZone: "UTC" }).format(date);
     const label = item.localName || item.name || "Public holiday";
@@ -267,9 +238,9 @@ function createDashboardTemplate() {
       <span class="holiday-date">${month}<br/>${day}</span>
       <div>
         <div class="holiday-name">${label}</div>
-        <div class="holiday-place">Public holiday · ${item.country || state.holidayCountry}</div>
+        <div class="holiday-place">${item.created ? "Added holiday" : `Public holiday · ${item.country || state.holidayCountry}`}</div>
         <div class="holiday-meta">${dateLabel}</div>
-        <div class="holiday-status status-approved">Public holiday</div>
+        <div class="holiday-status status-approved">${item.created ? "Added holiday" : "Public holiday"}</div>
       </div>
     </div>`;
   }).join("");
@@ -278,6 +249,7 @@ function createDashboardTemplate() {
     .sort((a, b) => new Date(a.date) - new Date(b.date));
   const createdHolidays = (state.leaveData || [])
     .filter((item) => String(item.type || "").toLowerCase() === "holiday")
+    .map((item) => ({ ...item, date: item.startDate, localName: item.name, created: true }))
     .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
   const upcomingHolidayItems = [...publicHolidays, ...createdHolidays].sort(
     (a, b) => new Date(a.date || a.startDate) - new Date(b.date || b.startDate)
@@ -285,21 +257,7 @@ function createDashboardTemplate() {
   const timeOffItems = (state.leaveData || [])
     .filter((item) => String(item.type || "").toLowerCase() !== "holiday")
     .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
-  const createLeaveCard = (title, items, key, emptyText, rowRenderer = renderLeaveRows) => {
-    return `<aside class="card holidays-card leave-summary-card">
-      <div class="card-title-row">
-        <div>
-          <h2>${title}</h2>
-          <span class="card-subtitle">${items.length ? `${items.length} scheduled` : "Keep your calendar up to date"}</span>
-        </div>
-        ${state.user?.role === "admin" && key === "holidays" ? `<button class="btn btn-primary" type="button" id="add-holiday-dashboard">Add Holiday</button>` : ""}
-        ${state.user?.role === "admin" && key === "timeOff" ? `<button class="btn btn-primary" type="button" id="add-leave-dashboard">Add Leave Request</button>` : ""}
-      </div>
-      <div class="holiday-list">${rowRenderer(items) || `<p class="empty-note">${emptyText}</p>`}</div>
-    </aside>`;
-  };
-
-  return `<div class="period-tabs" role="tablist" aria-label="Select dashboard period">
+  return `<div class="period-tabs dashboard-period-tabs" role="tablist" aria-label="Select dashboard period">
           <button class="tab ${state.dashboardPeriod === "day" ? "active" : ""}" type="button" id="tab-day" data-period="day" aria-pressed="${state.dashboardPeriod === "day"}">Today</button>
           <button class="tab ${state.dashboardPeriod === "week" ? "active" : ""}" type="button" id="tab-week" data-period="week" aria-pressed="${state.dashboardPeriod === "week"}">Week</button>
           <button class="tab ${state.dashboardPeriod === "month" ? "active" : ""}" type="button" id="tab-month" data-period="month" aria-pressed="${state.dashboardPeriod === "month"}">Month</button>
@@ -312,9 +270,26 @@ function createDashboardTemplate() {
             <div class="profile-details-row"><span class="small-label">Location</span><span class="value-text">${dbLocation}</span></div>
             <div class="profile-details-row"><span class="small-label">Timezone</span><span class="value-text">${dbTimezone}</span></div>
           </section>
-          ${createLeaveCard("Upcoming Holidays", upcomingHolidayItems, "holidays", "No upcoming holidays scheduled.", (items) => items.map((item) => item.startDate ? renderLeaveRows([item]) : renderPublicHolidayRows([item])).join(""))}
-          ${createLeaveCard("Leave Requests", timeOffItems, "timeOff", "No leave requests scheduled.")}
-          ${createLeaveModalHtml()}
+          <section class="card leave-summary-card">
+            <div class="card-title-row">
+              <div>
+                <h2>Time off</h2>
+                <span class="card-subtitle">Your upcoming leave requests</span>
+              </div>
+              <button class="icon-button dashboard-card-link" type="button" data-dashboard-page="timeoff" aria-label="View all time off">›</button>
+            </div>
+            <div class="holiday-list">${renderLeaveRows(timeOffItems.slice(0, 4)) || '<p class="empty-note">No upcoming time off.</p>'}</div>
+          </section>
+          <section class="card leave-summary-card">
+            <div class="card-title-row">
+              <div>
+                <h2>Upcoming holidays</h2>
+                <span class="card-subtitle">Public and added holidays</span>
+              </div>
+              <button class="icon-button dashboard-card-link" type="button" data-dashboard-page="holidays" aria-label="View all holidays">›</button>
+            </div>
+            <div class="holiday-list">${renderPublicHolidayRows(upcomingHolidayItems.slice(0, 4)) || '<p class="empty-note">No upcoming holidays.</p>'}</div>
+          </section>
         </div>
         <section class="card tracked-card">
           <div class="card-heading"><h2>Tracked Hours</h2></div>
@@ -328,16 +303,6 @@ function createDashboardTemplate() {
               <div class="status-row">
                 <span class="status-pill status-${state.status}"><span class="dot"></span><span id="status-text">${statusLabels[state.status]}</span></span>
                 <span class="location-strip" id="location-strip">${state.locationLabel}</span>
-              </div>
-              <div class="break-allowance-bar" id="break-allowance-bar">
-                <div class="break-allowance-info">
-                  <span class="break-allowance-label">Daily Break Allowance</span>
-                  <span class="break-allowance-time">${breakAllowance.usedBreakMinutes}/${breakAllowance.dailyBreakAllowanceMinutes} min used</span>
-                </div>
-                <div class="break-allowance-progress">
-                  <div class="break-allowance-fill break-allowance-${breakAllowanceStatus}" style="width: ${breakAllowancePercent}%"></div>
-                </div>
-                <span class="break-allowance-remaining">${breakAllowance.remainingBreakMinutes} min remaining</span>
               </div>
               <div class="chart-container" style="margin-top:18px;">
                 <canvas id="daily-hours-chart"></canvas>
@@ -491,7 +456,10 @@ function renderDailyHoursChart() {
 }
 
 function renderDashboard() {
-  loadLeaves().then(() => {
+  Promise.all([
+    loadLeaves(),
+    loadPublicHolidays(state.holidayCountry, state.holidayYear),
+  ]).then(() => {
     root.innerHTML = createPageShell("Dashboard", createDashboardTemplate());
     attachDashboardListeners();
     updateDashboardValues();
@@ -596,18 +564,30 @@ function openBreakReasonModal() {
     if (otherInput) otherInput.value = "";
   }
 
-  // Update break allowance info in modal if exists
-  const breakAllowanceInfo = document.getElementById("break-allowance-modal-info");
-  if (breakAllowanceInfo) {
-    const breakAllowance = state.breakAllowance || { remainingBreakMinutes: 60, dailyBreakAllowanceMinutes: 60 };
-    breakAllowanceInfo.textContent = `You have ${breakAllowance.remainingBreakMinutes} minutes of break time remaining today (allowance: ${breakAllowance.dailyBreakAllowanceMinutes} min).`;
-  }
-
   modal.style.display = "flex";
 }
 
 function closeBreakReasonModal() {
   const modal = document.getElementById("break-reason-modal");
+  if (modal) modal.style.display = "none";
+}
+
+function openAttendanceTimeModal(endpoint) {
+  const modal = document.getElementById("attendance-time-modal");
+  const form = document.getElementById("attendance-time-form");
+  const input = document.getElementById("attendance-time");
+  const title = document.getElementById("attendance-time-title");
+  if (!modal || !form || !input) return;
+
+  title.textContent = `${actionTextMap[endpoint] || "Attendance action"} time`;
+  input.value = new Date().toISOString().slice(0, 16);
+  form.dataset.endpoint = endpoint;
+  modal.style.display = "flex";
+  input.focus();
+}
+
+function closeAttendanceTimeModal() {
+  const modal = document.getElementById("attendance-time-modal");
   if (modal) modal.style.display = "none";
 }
 
@@ -620,6 +600,10 @@ function attachDashboardListeners() {
         setPage(nextPage);
       }
     });
+  }
+
+  for (const link of document.querySelectorAll("[data-dashboard-page]")) {
+    link.addEventListener("click", () => setPage(link.dataset.dashboardPage));
   }
 
   const logoutButton = document.getElementById("logout-btn");
@@ -764,11 +748,9 @@ function attachDashboardListeners() {
         }
         await loadLeaves();
         closeLeaveModal();
-        if (state.page === "timeoff") {
-          renderTimeOff();
-        } else {
-          renderDashboard();
-        }
+        if (state.page === "timeoff") renderTimeOff();
+        else if (state.page === "holidays") renderHolidays();
+        else renderDashboard();
       } catch (error) {
         console.error("Failed to save leave:", error);
         alert("Failed to save leave. Please try again.");
@@ -861,7 +843,7 @@ function attachDashboardListeners() {
     });
   }
 
-  const tabs = document.querySelectorAll(".period-tabs .tab");
+  const tabs = document.querySelectorAll(".dashboard-period-tabs .tab");
   for (const tab of tabs) {
     tab.addEventListener("click", async () => {
       const nextPeriod = tab.dataset.period || "day";
@@ -900,20 +882,6 @@ function attachDashboardListeners() {
   }
 
   // Add Leave button on dashboard
-  const addLeaveDashboard = document.getElementById("add-leave-dashboard");
-  if (addLeaveDashboard) {
-    addLeaveDashboard.addEventListener("click", () => {
-      openLeaveModal(null);
-    });
-  }
-
-  const addHolidayDashboard = document.getElementById("add-holiday-dashboard");
-  if (addHolidayDashboard) {
-    addHolidayDashboard.addEventListener("click", () => {
-      openLeaveModal(null, true);
-    });
-  }
-
   // Leave modal event listeners (shared between dashboard and timeoff pages)
   attachLeaveModalListeners();
 
@@ -948,7 +916,9 @@ function attachDashboardListeners() {
       }
 
       closeBreakReasonModal();
-      await performAction("break-start", { reason });
+      openAttendanceTimeModal("break-start");
+      const timeForm = document.getElementById("attendance-time-form");
+      if (timeForm) timeForm.dataset.reason = reason;
     });
   }
 
@@ -968,15 +938,28 @@ function attachDashboardListeners() {
   const breakStart = document.getElementById("btn-break-start");
   if (breakStart) {
     breakStart.addEventListener("click", () => {
-      // Check if break allowance is exceeded before opening modal
-      const breakAllowance = state.breakAllowance || { remainingBreakMinutes: 60 };
-      if (breakAllowance.remainingBreakMinutes <= 0) {
-        alert(`You have exceeded your daily break allowance of ${breakAllowance.dailyBreakAllowanceMinutes} minutes. You've used ${breakAllowance.usedBreakMinutes} minutes today.`);
-        return;
-      }
       openBreakReasonModal();
     });
   }
+
+  const attendanceTimeForm = document.getElementById("attendance-time-form");
+  if (attendanceTimeForm) {
+    attendanceTimeForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const time = document.getElementById("attendance-time").value;
+      if (!time) return;
+      const endpoint = attendanceTimeForm.dataset.endpoint;
+      const reason = attendanceTimeForm.dataset.reason;
+      closeAttendanceTimeModal();
+      await performAction(endpoint, { timestampUtc: new Date(time).toISOString(), ...(reason ? { reason } : {}) });
+      delete attendanceTimeForm.dataset.reason;
+    });
+  }
+
+  const attendanceTimeCancel = document.getElementById("cancel-attendance-time");
+  if (attendanceTimeCancel) attendanceTimeCancel.addEventListener("click", closeAttendanceTimeModal);
+  const attendanceTimeClose = document.getElementById("close-attendance-time-modal");
+  if (attendanceTimeClose) attendanceTimeClose.addEventListener("click", closeAttendanceTimeModal);
 
   for (const [buttonId, endpoint] of Object.entries(actionEndpointMap)) {
     const button = document.getElementById(buttonId);
@@ -985,7 +968,7 @@ function attachDashboardListeners() {
         // Skip - we handle this separately above
         continue;
       } else {
-        button.addEventListener("click", () => performAction(endpoint));
+        button.addEventListener("click", () => openAttendanceTimeModal(endpoint));
       }
     }
   }
@@ -1096,6 +1079,15 @@ function renderHistory() {
     tr.append(createCell(day.checkOutUtc ? formatTime(day.checkOutUtc, zone) : "—"));
     tr.append(createCell(formatDuration(day.breakSeconds)));
     tr.append(createCell(formatDuration(day.workedSeconds)));
+    if (state.page === "timesheets") {
+      const actionCell = document.createElement("td");
+      const events = (day.events || []).filter((event) => ["check_in", "break_start", "break_end", "check_out"].includes(event.type));
+      const firstEvent = events[0];
+      const eventIds = events.map((event) => event.id).join(",");
+      const dayActions = events.length ? `<span class="timesheet-history-day-actions"><button class="mini-action" type="button" data-edit-timesheet-day="${day.date}">Edit day</button><button class="mini-action danger" type="button" data-delete-timesheet-day="${eventIds}">Delete day</button></span>` : "";
+      actionCell.innerHTML = dayActions || "—";
+      tr.append(actionCell);
+    }
     body.appendChild(tr);
   });
 }
@@ -1124,11 +1116,7 @@ async function performAction(endpoint, extraPayload = {}) {
     updateDashboardValues();
     await loadHistory();
   } catch (err) {
-    if (err.breakAllowanceExceeded) {
-      alert(`Break allowance exceeded: ${err.error}`);
-    } else {
-      alert(err.error || "That action couldn't be completed.");
-    }
+    alert(err.error || "That action couldn't be completed.");
   } finally {
     setBusy(false);
   }
@@ -1278,6 +1266,8 @@ function attachLeaveModalListeners() {
         closeLeaveModal();
         if (state.page === "timeoff") {
           renderTimeOff();
+        } else if (state.page === "holidays") {
+          renderHolidays();
         } else {
           renderDashboard();
         }

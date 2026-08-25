@@ -112,7 +112,7 @@ const ALLOWED_NEXT = {
   checked_out: null,
 };
 
-function canPerform(status, action) {
+function canPerform(status, action, dayEvents = []) {
   const allowed = ALLOWED_NEXT[status];
   if (!allowed) return false;
   if (Array.isArray(allowed)) return allowed.includes(action);

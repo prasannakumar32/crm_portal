@@ -19,41 +19,16 @@ function recordAction(type) {
     const events = await db.getEventsForEmployee(employeeId);
     const { status } = logic.getStatus(events, employeeTimeZone);
 
-    if (!logic.canPerform(status, type)) {
-      return res.status(409).json({
-        error: `You can't ${ACTION_LABEL[type]} right now (current status: ${status.replace("_", " ")}).`,
-        status,
-      });
-    }
-
-    const { latitude, longitude, address, reason } = req.body || {};
-
-    if (type === "break_start") {
-      const normalizedReason = typeof reason === "string" ? reason.trim() : "";
-      if (!normalizedReason) {
-        return res.status(400).json({ error: "Please select a break reason before starting your break." });
-      }
-
-      // Check break time allowance
-      const { todayEvents } = logic.getStatus(events, employeeTimeZone);
-      const durations = logic.computeDurations(todayEvents);
-      const dailyBreakAllowanceMinutes = employee.dailyBreakAllowanceMinutes || 60;
-      const usedBreakMinutes = Math.floor(durations.breakSeconds / 60);
-
-      if (usedBreakMinutes >= dailyBreakAllowanceMinutes) {
-        return res.status(409).json({
-          error: `You have exceeded your daily break allowance of ${dailyBreakAllowanceMinutes} minutes. You've used ${usedBreakMinutes} minutes today.`,
-          status,
-          breakAllowanceExceeded: true,
-          usedBreakMinutes,
-          dailyBreakAllowanceMinutes,
-        });
-      }
+    const { timestampUtc, latitude, longitude, address, reason } = req.body || {};
+    const actionTime = new Date(timestampUtc);
+    if (!timestampUtc || Number.isNaN(actionTime.getTime())) {
+      return res.status(400).json({ error: "Please enter a valid time for this action." });
     }
 
     const event = await db.addEvent({
       employeeId,
       type,
+      timestampUtc: actionTime.toISOString(),
       latitude: typeof latitude === "number" ? latitude : null,
       longitude: typeof longitude === "number" ? longitude : null,
       address: typeof address === "string" ? address.slice(0, 300) : null,
@@ -73,6 +48,29 @@ router.post("/break-start", recordAction("break_start"));
 router.post("/break-end", recordAction("break_end"));
 router.post("/check-out", recordAction("check_out"));
 
+router.put("/events/:id", async (req, res) => {
+  const employeeId = req.session.employeeId || req.session.userId;
+  const { timestampUtc, reason } = req.body || {};
+  const eventTime = new Date(timestampUtc);
+  if (!timestampUtc || Number.isNaN(eventTime.getTime())) {
+    return res.status(400).json({ error: "Please enter a valid time for this event." });
+  }
+
+  const event = await db.updateAttendanceEvent(employeeId, req.params.id, {
+    timestampUtc: eventTime.toISOString(),
+    reason,
+  });
+  if (!event) return res.status(404).json({ error: "Attendance event not found." });
+  res.json({ event });
+});
+
+router.delete("/events/:id", async (req, res) => {
+  const employeeId = req.session.employeeId || req.session.userId;
+  const deleted = await db.deleteAttendanceEvent(employeeId, req.params.id);
+  if (!deleted) return res.status(404).json({ error: "Attendance event not found." });
+  res.json({ success: true });
+});
+
 router.get("/today", async (req, res) => {
   const employeeId = req.session.employeeId || req.session.userId;
   const employee = await db.findEmployeeById(employeeId);
@@ -80,20 +78,7 @@ router.get("/today", async (req, res) => {
   const events = await db.getEventsForEmployee(employeeId);
   const { status, todayEvents } = logic.getStatus(events, employeeTimeZone);
   const durations = logic.computeDurations(todayEvents);
-  const dailyBreakAllowanceMinutes = employee.dailyBreakAllowanceMinutes || 60;
-  const usedBreakMinutes = Math.floor(durations.breakSeconds / 60);
-  const remainingBreakMinutes = Math.max(0, dailyBreakAllowanceMinutes - usedBreakMinutes);
-
-  res.json({ 
-    status, 
-    today: todayEvents, 
-    durations,
-    breakAllowance: {
-      dailyBreakAllowanceMinutes,
-      usedBreakMinutes,
-      remainingBreakMinutes,
-    }
-  });
+  res.json({ status, today: todayEvents, durations });
 });
 
 router.get("/history", async (req, res) => {

@@ -603,21 +603,35 @@ button {
 
 @media (max-width: 1500px) and (min-width: 761px) {
   .app-header {
+    display: grid;
+    grid-template-columns: minmax(180px, 0.32fr) minmax(0, 1fr);
     align-items: flex-start;
     padding-top: 16px;
     padding-bottom: 16px;
   }
 
   .header-actions {
+    width: 100%;
     display: grid;
-    grid-template-columns: repeat(4, auto);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     justify-content: end;
     gap: 8px 10px;
   }
 
   .header-icon-actions {
     grid-column: 1 / -1;
+    width: 100%;
     justify-content: flex-end;
+  }
+
+  .header-actions .current-time,
+  .header-actions .login-time,
+  .header-actions .user-chip,
+  .header-actions .location-badge {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .page-header-user-management h1 {
@@ -636,6 +650,8 @@ button {
   margin: 0 auto;
   padding: 30px;
   background: #ffffff;
+  border: 1px solid #dbe7ea;
+  box-shadow: 0 16px 36px rgba(29, 79, 87, 0.08);
 }
 
 .holidays-page-header {
@@ -651,6 +667,11 @@ button {
   margin: 4px 0 6px;
   font-size: 24px;
   color: #15343b;
+}
+
+.holidays-page-card .holidays-page-header h2 {
+  font-size: 20px;
+  letter-spacing: 0;
 }
 
 .holidays-page-header p {
@@ -669,11 +690,11 @@ button {
 .holiday-switch {
   display: inline-flex;
   gap: 4px;
-  margin: 24px 0 18px;
+  margin: 22px 0 20px;
   padding: 4px;
   border: 1px solid #dbe4ea;
   border-radius: 8px;
-  background: #f8fafc;
+  background: #f4f8f9;
 }
 
 .holiday-switch-button {
@@ -692,6 +713,7 @@ button {
 .holiday-switch-button.active {
   background: var(--primary);
   color: #ffffff;
+  box-shadow: 0 4px 10px rgba(37, 107, 114, 0.2);
 }
 
 .holiday-year-controls {
@@ -709,6 +731,49 @@ button {
   border-radius: 6px;
   color: #256b72;
   font-size: 22px;
+}
+
+.holiday-year-button:hover {
+  border-color: #8dbbbb;
+  background: #eef8f6;
+  color: #15343b;
+}
+
+.holidays-page-card .holiday-list {
+  max-height: 560px;
+  overflow-y: auto;
+  padding: 2px 6px 2px 2px;
+}
+
+.holidays-page-card .holiday-row {
+  padding: 12px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.holidays-page-card .holiday-row:hover {
+  border-color: #d6e7e8;
+  background: rgba(255, 255, 255, 0.72);
+  transform: translateY(-1px);
+}
+
+.holidays-page-card .holiday-date {
+  flex: 0 0 50px;
+  background: #e8f4f3;
+  color: #256b72;
+}
+
+.holidays-page-card .holiday-name {
+  font-size: 14px;
+}
+
+.holidays-page-card .holiday-place {
+  margin-top: 2px;
+}
+
+.holidays-page-card .holiday-status {
+  margin-top: 6px;
 }
 
 .calendar-holiday-list {
@@ -781,7 +846,7 @@ button {
 
 @media (max-width: 640px) {
   .holidays-page-card {
-    padding: 20px;
+    padding: 20px 16px;
   }
 
   .holidays-page-header {
@@ -790,6 +855,19 @@ button {
 
   .holiday-year-controls {
     margin-top: 18px;
+  }
+
+  .holiday-switch {
+    width: 100%;
+  }
+
+  .holiday-switch-button {
+    flex: 1;
+  }
+
+  .holidays-page-card .holiday-row {
+    align-items: flex-start;
+    padding: 10px 6px;
   }
 
   .calendar-holiday-row {
@@ -1221,6 +1299,10 @@ button {
   z-index: 50;
   backdrop-filter: blur(4px);
   animation: fadeIn 0.2s ease;
+}
+
+.task-modal-overlay[hidden] {
+  display: none !important;
 }
 
 @keyframes fadeIn {
@@ -2193,6 +2275,168 @@ button {
   margin-bottom: 18px;
 }
 
+.timesheet-modal-card {
+  width: min(680px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.timesheet-modal-card .task-modal-header {
+  margin: -24px -24px 0;
+  padding: 18px 24px;
+}
+
+.timesheet-modal-card .task-modal-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 18px;
+}
+
+.timesheet-form-intro {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.timesheet-edit-date-time {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.timesheet-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 24px;
+  margin-bottom: 18px;
+  background: linear-gradient(135deg, #fafdff 0%, #eefaf6 100%);
+  border-color: var(--border);
+}
+
+.timesheet-toolbar h2 {
+  margin: 0 0 4px;
+  color: #176b6d;
+  font-size: 17px;
+}
+
+.timesheet-toolbar p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.timesheet-manual-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.timesheet-time-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+.timesheet-manual-form input[type="date"],
+.timesheet-manual-form input[type="time"],
+.timesheet-manual-form input[type="text"] {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid #cbdde0;
+  border-radius: 8px;
+  background: #fbfefe;
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.timesheet-manual-form input:focus {
+  outline: 2px solid rgba(37, 107, 114, 0.18);
+  border-color: #4d9997;
+}
+
+.timesheet-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.timesheet-events-card,
+.timesheet-edit-card {
+  background: linear-gradient(180deg, #fbfdfd 0%, #edf8f6 100%);
+  border-color: var(--border);
+}
+
+.timesheet-event-list {
+  display: grid;
+  gap: 8px;
+}
+
+.timesheet-event-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid #dbe7ea;
+  border-radius: 9px;
+  background: #ffffff;
+}
+
+.timesheet-event-row > div {
+  display: grid;
+  gap: 3px;
+}
+
+.timesheet-event-row strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.timesheet-event-row span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.timesheet-event-actions,
+.timesheet-history-action-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.timesheet-event-actions .mini-action,
+.timesheet-history-action-group .mini-action {
+  margin: 0;
+}
+
+.timesheet-history-action-group {
+  margin: 2px 4px 2px 0;
+}
+
+.timesheet-history-day-actions {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 0 7px;
+  margin-bottom: 3px;
+  border-bottom: 1px solid #e1ecee;
+}
+
+.timesheet-history-day-actions::before {
+  content: "Day";
+  margin-right: 2px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .timesheet-entry-card h2 {
   margin: 0 0 4px;
 }
@@ -2285,6 +2529,34 @@ button {
 }
 
 @media (max-width: 760px) {
+  .timesheet-modal {
+    align-items: flex-start;
+    padding: 16px;
+  }
+
+  .timesheet-modal-card {
+    width: min(100%, 560px);
+    padding: 18px;
+  }
+
+  .timesheet-modal-card .task-modal-header {
+    margin: -18px -18px 0;
+    padding: 16px 18px;
+  }
+
+  .timesheet-edit-date-time {
+    grid-template-columns: 1fr;
+  }
+
+  .timesheet-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .timesheet-time-grid {
+    grid-template-columns: repeat(2, minmax(130px, 1fr));
+  }
+
   .timesheet-step {
     grid-template-columns: 28px 1fr;
   }

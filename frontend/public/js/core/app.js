@@ -60,7 +60,11 @@ async function init() {
     if (page === "tasks") {
       initTasksPage().catch(() => {});
     }
-    if (page === "timesheets" || page === "timeoff" || page === "holidays" || page === "work-schedules" || page === "user-management") {
+    if (page === "timesheets") {
+      loadToday().catch(() => {});
+      loadHistory().catch(() => {});
+    }
+    if (page === "timeoff" || page === "holidays" || page === "work-schedules" || page === "user-management") {
       loadToday().catch(() => {});
     }
   });
@@ -87,7 +91,10 @@ async function init() {
     } else if (state.page === "user-management") {
       await loadToday();
       await loadEmployees();
-    } else if (state.page === "timesheets" || state.page === "timeoff" || state.page === "work-schedules") {
+    } else if (state.page === "timesheets") {
+      await loadToday();
+      await loadHistory();
+    } else if (state.page === "timeoff" || state.page === "work-schedules") {
       await loadToday();
     }
   }
