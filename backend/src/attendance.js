@@ -11,6 +11,15 @@ const ACTION_LABEL = {
   check_out: "check out",
 };
 
+async function requireAdminForHoliday(req, res) {
+  const employee = await db.findEmployeeById(req.session.employeeId || req.session.userId);
+  if (!employee || employee.role !== "admin") {
+    res.status(403).json({ error: "Admin access required for holidays." });
+    return false;
+  }
+  return true;
+}
+
 function recordAction(type) {
   return async (req, res) => {
     const employeeId = req.session.employeeId || req.session.userId;
@@ -111,12 +120,14 @@ router.post("/leaves", async (req, res) => {
   try {
     const employee = await db.findEmployeeById(req.session.employeeId || req.session.userId);
     const { name, type, location, startDate, endDate, reason, status } = req.body;
+    const leaveType = type || "Annual Leave";
     if (!name || !startDate || !endDate || !reason) {
       return res.status(400).json({ error: "Missing required fields" });
     }
+    if (String(leaveType).toLowerCase() === "holiday" && !(await requireAdminForHoliday(req, res))) return;
     const leave = await db.createLeave({
       name,
-      type: type || "Annual Leave",
+      type: leaveType,
       location: location || employee.location || "India",
       startDate,
       endDate,
@@ -134,6 +145,12 @@ router.put("/leaves/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { name, type, location, startDate, endDate, reason, status } = req.body;
+    const existingLeave = await db.getLeaveById(id);
+    if (!existingLeave) {
+      return res.status(404).json({ error: "Leave not found" });
+    }
+    const isHoliday = String(existingLeave.type || "").toLowerCase() === "holiday" || String(type || "").toLowerCase() === "holiday";
+    if (isHoliday && !(await requireAdminForHoliday(req, res))) return;
     const leave = await db.updateLeave(id, {
       name,
       type,
@@ -143,9 +160,6 @@ router.put("/leaves/:id", async (req, res) => {
       reason,
       status,
     });
-    if (!leave) {
-      return res.status(404).json({ error: "Leave not found" });
-    }
     res.json({ leave });
   } catch (error) {
     console.error("Error updating leave:", error);
@@ -156,10 +170,12 @@ router.put("/leaves/:id", async (req, res) => {
 router.delete("/leaves/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const success = await db.deleteLeave(id);
-    if (!success) {
+    const existingLeave = await db.getLeaveById(id);
+    if (!existingLeave) {
       return res.status(404).json({ error: "Leave not found" });
     }
+    if (String(existingLeave.type || "").toLowerCase() === "holiday" && !(await requireAdminForHoliday(req, res))) return;
+    const success = await db.deleteLeave(id);
     res.json({ success: true });
   } catch (error) {
     console.error("Error deleting leave:", error);

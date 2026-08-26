@@ -1192,7 +1192,7 @@ function openLeaveModal(leaveId, holidayMode = false) {
   const reasonInput = document.getElementById("leave-reason");
   const statusInput = document.getElementById("leave-status");
 
-  if (modalTitle) modalTitle.textContent = holidayMode ? "New Upcoming Holiday" : leave ? (isAdmin ? "Edit Leave Request" : "View/Edit Leave Request") : "New Leave Request";
+  if (modalTitle) modalTitle.textContent = holidayMode ? (leave ? "Edit Holiday" : "New Upcoming Holiday") : leave ? (isAdmin ? "Edit Leave Request" : "View/Edit Leave Request") : "New Leave Request";
   if (idInput) idInput.value = leave ? String(leave.id) : "";
   if (nameInput) nameInput.value = leave?.name || "";
   if (typeInput) {
@@ -1204,7 +1204,7 @@ function openLeaveModal(leaveId, holidayMode = false) {
   const submitButton = document.getElementById("submit-leave");
   if (nameLabel) nameLabel.childNodes[0].textContent = holidayMode ? "Holiday Name " : "Leave Name ";
   if (reasonLabel) reasonLabel.childNodes[0].textContent = holidayMode ? "Description " : "Reason ";
-  if (submitButton) submitButton.textContent = holidayMode ? "Create Holiday" : "Submit Request";
+  if (submitButton) submitButton.textContent = holidayMode ? (leave ? "Save Holiday" : "Create Holiday") : "Submit Request";
   if (locationInput) locationInput.value = leave?.location || state.user?.location || "Australia";
   if (dateInput) dateInput.value = leave?.startDate || new Date().toISOString().slice(0, 10);
   if (endDateInput) endDateInput.value = leave?.endDate || leave?.startDate || new Date().toISOString().slice(0, 10);

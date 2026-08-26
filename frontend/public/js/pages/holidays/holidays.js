@@ -32,6 +32,11 @@ function createHolidaysTemplate() {
   const holidayRows = holidays.map((holiday) => {
     const dateParts = holidayDateParts(holiday.date);
     if (!dateParts) return "";
+    const actions = state.user?.role === "admin" && holiday.created ? `
+          <div class="holiday-actions">
+            <button class="btn btn-ghost" type="button" data-action="edit-holiday" data-id="${holiday.id}">Edit</button>
+            <button class="btn btn-danger" type="button" data-action="delete-holiday" data-id="${holiday.id}">Delete</button>
+          </div>` : "";
     return `
       <div class="holiday-row">
         <span class="holiday-date">${dateParts.month}<br/>${dateParts.day}</span>
@@ -40,6 +45,7 @@ function createHolidaysTemplate() {
           <div class="holiday-place">${holiday.created ? (holiday.reason || "Added holiday") : `${holiday.name && holiday.name !== holiday.localName ? holiday.name : `${countryName} public holiday`}`}</div>
           <div class="holiday-meta">${dateParts.full}</div>
           <div class="holiday-status status-approved">${holiday.created ? "Added holiday" : "Public holiday"}</div>
+          ${actions}
         </div>
       </div>`;
   }).join("");
@@ -70,8 +76,23 @@ function renderHolidays() {
     root.innerHTML = createPageShell("Upcoming Holidays", `${createHolidaysTemplate()}${createLeaveModalHtml()}`);
     const addHoliday = document.getElementById("add-holiday");
     if (addHoliday) addHoliday.addEventListener("click", () => openLeaveModal(null, true));
-    attachLeaveModalListeners();
     attachDashboardListeners();
+    for (const button of document.querySelectorAll("[data-action='edit-holiday']")) {
+      button.addEventListener("click", () => openLeaveModal(button.dataset.id, true));
+    }
+    for (const button of document.querySelectorAll("[data-action='delete-holiday']")) {
+      button.addEventListener("click", async () => {
+        if (!confirm("Delete this holiday?")) return;
+        try {
+          await deleteLeave(button.dataset.id);
+          await loadLeaves();
+          renderHolidays();
+        } catch (error) {
+          console.error("Failed to delete holiday:", error);
+          alert("Failed to delete holiday. Please try again.");
+        }
+      });
+    }
     for (const button of document.querySelectorAll("[data-holiday-country]")) {
       button.addEventListener("click", async () => {
         const country = button.dataset.holidayCountry;

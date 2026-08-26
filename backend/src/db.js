@@ -265,6 +265,16 @@ async function getLeaves() {
   }
 }
 
+async function getLeaveById(id) {
+  const db = await getDb();
+  try {
+    const leave = await db.collection("leaves").findOne({ _id: new ObjectId(id) });
+    return leave ? { ...leave, id: leave._id.toString() } : null;
+  } catch (err) {
+    return null;
+  }
+}
+
 async function createLeave(leaveData) {
   const db = await getDb();
   const doc = {
@@ -337,6 +347,7 @@ module.exports = {
   addTaskComment,
   addTaskAttachment,
   getLeaves,
+  getLeaveById,
   createLeave,
   updateLeave,
   deleteLeave,
