@@ -27,15 +27,21 @@ function createHolidaysTemplate() {
   const createdHolidays = (state.leaveData || [])
     .filter((item) => String(item.type || "").toLowerCase() === "holiday")
     .map((item) => ({ ...item, date: item.startDate, localName: item.name, created: true }));
-  const holidays = [...(state.holidayData || []), ...createdHolidays]
+  const createdDates = new Set(createdHolidays.map((holiday) => holiday.date));
+  const publicHolidays = (state.holidayData || []).filter((holiday) => !createdDates.has(holiday.date));
+  const holidays = [...publicHolidays, ...createdHolidays]
     .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  const holidayRows = holidays.map((holiday) => {
+  const holidayRows = holidays.map((holiday, index) => {
     const dateParts = holidayDateParts(holiday.date);
     if (!dateParts) return "";
     const actions = state.user?.role === "admin" && holiday.created ? `
           <div class="holiday-actions">
             <button class="btn btn-ghost" type="button" data-action="edit-holiday" data-id="${holiday.id}">Edit</button>
             <button class="btn btn-danger" type="button" data-action="delete-holiday" data-id="${holiday.id}">Delete</button>
+          </div>` : "";
+    const publicActions = state.user?.role === "admin" && !holiday.created ? `
+          <div class="holiday-actions">
+            <button class="btn btn-ghost" type="button" data-action="edit-public-holiday" data-date="${holiday.date}">Edit</button>
           </div>` : "";
     return `
       <div class="holiday-row">
@@ -45,7 +51,7 @@ function createHolidaysTemplate() {
           <div class="holiday-place">${holiday.created ? (holiday.reason || "Added holiday") : `${holiday.name && holiday.name !== holiday.localName ? holiday.name : `${countryName} public holiday`}`}</div>
           <div class="holiday-meta">${dateParts.full}</div>
           <div class="holiday-status status-approved">${holiday.created ? "Added holiday" : "Public holiday"}</div>
-          ${actions}
+          ${actions || publicActions}
         </div>
       </div>`;
   }).join("");
@@ -75,10 +81,29 @@ function renderHolidays() {
   Promise.all([loadLeaves(), loadPublicHolidays(state.holidayCountry, state.holidayYear)]).finally(() => {
     root.innerHTML = createPageShell("Upcoming Holidays", `${createHolidaysTemplate()}${createLeaveModalHtml()}`);
     const addHoliday = document.getElementById("add-holiday");
-    if (addHoliday) addHoliday.addEventListener("click", () => openLeaveModal(null, true));
+    if (addHoliday) addHoliday.addEventListener("click", () => {
+      state.holidayEditTarget = null;
+      openLeaveModal(null, true);
+    });
     attachDashboardListeners();
     for (const button of document.querySelectorAll("[data-action='edit-holiday']")) {
       button.addEventListener("click", () => openLeaveModal(button.dataset.id, true));
+    }
+    for (const button of document.querySelectorAll("[data-action='edit-public-holiday']")) {
+      button.addEventListener("click", () => {
+        const publicHoliday = (state.holidayData || []).find((item) => item.date === button.dataset.date);
+        if (!publicHoliday) return;
+        state.holidayEditTarget = {
+          name: publicHoliday.localName || publicHoliday.name || "Public holiday",
+          type: "Holiday",
+          location: publicHoliday.country || state.holidayCountry,
+          startDate: publicHoliday.date,
+          endDate: publicHoliday.date,
+          reason: publicHoliday.name || "Public holiday",
+          status: "Approved",
+        };
+        openLeaveModal(null, true);
+      });
     }
     for (const button of document.querySelectorAll("[data-action='delete-holiday']")) {
       button.addEventListener("click", async () => {
@@ -86,6 +111,7 @@ function renderHolidays() {
         try {
           await deleteLeave(button.dataset.id);
           await loadLeaves();
+          state.holidayEditTarget = null;
           renderHolidays();
         } catch (error) {
           console.error("Failed to delete holiday:", error);

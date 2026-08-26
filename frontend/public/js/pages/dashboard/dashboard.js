@@ -747,6 +747,7 @@ function attachDashboardListeners() {
           await createLeave(payload);
         }
         await loadLeaves();
+        state.holidayEditTarget = null;
         closeLeaveModal();
         if (state.page === "timeoff") renderTimeOff();
         else if (state.page === "holidays") renderHolidays();
@@ -1182,7 +1183,7 @@ function openLeaveModal(leaveId, holidayMode = false) {
   if (!modal) return;
 
   const isAdmin = state.user?.role === "admin";
-  const leave = leaveId == null ? null : (state.leaveData || []).find((row) => row.id === leaveId);
+  const leave = leaveId == null ? (holidayMode ? state.holidayEditTarget : null) : (state.leaveData || []).find((row) => row.id === leaveId);
   const idInput = document.getElementById("leave-id");
   const nameInput = document.getElementById("leave-name");
   const typeInput = document.getElementById("leave-type");

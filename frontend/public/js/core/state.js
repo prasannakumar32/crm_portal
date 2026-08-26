@@ -96,6 +96,7 @@ const state = {
   holidayCountry: "IN",
   holidayYear: new Date().getFullYear(),
   holidayData: [],
+  holidayEditTarget: null,
   holidayLoading: false,
   holidaySource: "calendar",
   locationLabel: "Locating…",
