@@ -197,6 +197,20 @@ async function createEmployee(payload) {
   });
 }
 
+async function updateEmployee(id, payload) {
+  if (!id || !payload) return null;
+  return apiJson(`/api/auth/employees/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+async function deleteEmployee(id) {
+  if (!id) return null;
+  return apiJson(`/api/auth/employees/${id}`, { method: "DELETE" });
+}
+
 async function loadEmployees() {
   try {
     const data = await apiJson("/api/tasks/employees");

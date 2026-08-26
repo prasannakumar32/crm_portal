@@ -63,6 +63,46 @@ async function createEmployee({ username, passwordHash, fullName, role = "employ
   return normalizeEmployee(await employees.findOne({ _id: r.insertedId }));
 }
 
+async function updateEmployee(id, { username, passwordHash, fullName, role, location, timezone }) {
+  const db = await getDb();
+  try {
+    const updates = {
+      username: username.trim(),
+      normalizedUsername: username.trim().toLowerCase(),
+      fullName: fullName.trim(),
+      role,
+      location: location || null,
+      timezone: timezone || null,
+      updatedAt: new Date().toISOString(),
+    };
+    if (passwordHash) updates.passwordHash = passwordHash;
+    for (const employees of getEmployeeCollections(db)) {
+      const result = await employees.findOneAndUpdate(
+        { _id: new ObjectId(id) },
+        { $set: updates },
+        { returnDocument: "after" }
+      );
+      if (result.value) return normalizeEmployee(result.value);
+    }
+    return null;
+  } catch (err) {
+    return null;
+  }
+}
+
+async function deleteEmployee(id) {
+  const db = await getDb();
+  try {
+    for (const employees of getEmployeeCollections(db)) {
+      const result = await employees.deleteOne({ _id: new ObjectId(id) });
+      if (result.deletedCount > 0) return true;
+    }
+    return false;
+  } catch (err) {
+    return false;
+  }
+}
+
 async function getAllEvents() {
   const db = await getDb();
   const events = await db.collection("attendance").find({}).sort({ timestampUtc: 1 }).toArray();
@@ -333,6 +373,8 @@ module.exports = {
   findEmployeeByUsername,
   findEmployeeById,
   createEmployee,
+  updateEmployee,
+  deleteEmployee,
   getAllEvents,
   getEventsForEmployee,
   addEvent,

@@ -86,6 +86,55 @@ router.post("/create-user", canManageEmployees, async (req, res) => {
   return createEmployeeHandler(req, res);
 });
 
+router.put("/employees/:id", canManageEmployees, async (req, res) => {
+  try {
+    const { username, password, fullName, role, location, timezone } = req.body || {};
+    if (!username || !fullName) {
+      return res.status(400).json({ error: "Full name and username are required." });
+    }
+    if (!USERNAME_RE.test(username.trim())) {
+      return res.status(400).json({ error: "Username must be 3-32 characters: letters, numbers, underscore or dot only." });
+    }
+    if (!['employee', 'admin'].includes(role)) {
+      return res.status(400).json({ error: "Role must be employee or admin." });
+    }
+    const existingUsername = await db.findEmployeeByUsername(username);
+    const target = await db.findEmployeeById(req.params.id);
+    if (!target) return res.status(404).json({ error: "Employee not found." });
+    if (existingUsername && existingUsername.id !== target.id) {
+      return res.status(409).json({ error: "That username is already taken." });
+    }
+    if (password && password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters." });
+    }
+    const passwordHash = password ? await bcrypt.hash(password, 10) : undefined;
+    const employee = await db.updateEmployee(req.params.id, { username, passwordHash, fullName, role, location, timezone });
+    if (!employee) return res.status(404).json({ error: "Employee not found." });
+    res.json({ employee });
+  } catch (err) {
+    res.status(500).json({ error: err.message || "Internal error" });
+  }
+});
+
+router.delete("/employees/:id", canManageEmployees, async (req, res) => {
+  try {
+    if (String(req.params.id) === String(req.session.employeeId || req.session.userId)) {
+      return res.status(400).json({ error: "You cannot delete your own account." });
+    }
+    const target = await db.findEmployeeById(req.params.id);
+    if (!target) return res.status(404).json({ error: "Employee not found." });
+    if (target.role === "admin") {
+      const admins = (await db.getEmployees()).filter((employee) => employee.role === "admin");
+      if (admins.length <= 1) return res.status(400).json({ error: "The last admin account cannot be deleted." });
+    }
+    const success = await db.deleteEmployee(req.params.id);
+    if (!success) return res.status(404).json({ error: "Employee not found." });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message || "Internal error" });
+  }
+});
+
 router.post("/login", async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {

@@ -1327,9 +1327,8 @@ function createEmployeeManagementTemplate() {
       <td>${user.location || "—"}</td>
       <td>${user.timezone || "—"}</td>
       <td>
-        <!-- Break allowance is temporarily disabled. Restore this button later when needed.
-        <button type="button" class="mini-action" data-action="edit-break-allowance" data-id="${user.id}" data-break-allowance="${user.dailyBreakAllowanceMinutes || 60}">Edit Break</button>
-        -->
+        <button type="button" class="mini-action" data-action="edit-user" data-id="${user.id}">Edit</button>
+        <button type="button" class="mini-action" data-action="delete-user" data-id="${user.id}">Delete</button>
       </td>
     </tr>
   `).join("");
@@ -1358,6 +1357,29 @@ function createEmployeeManagementTemplate() {
             </table>
           </div>
         </section>
+        <div class="task-modal-overlay" id="user-modal" style="display:none;">
+          <div class="task-modal-card">
+            <div class="task-modal-header">
+              <h3 id="user-modal-title">Create New Employee</h3>
+              <button class="icon-button" id="close-user-modal" type="button">&times;</button>
+            </div>
+            <form id="user-form">
+              <input type="hidden" id="user-id" />
+              <div class="form-section"><h4 class="form-section-title">Employee Details</h4><div class="form-grid">
+                <label class="field-block full-width"><span>Full Name <span class="required-indicator">*</span></span><input id="user-fullname" required /></label>
+                <label class="field-block"><span>Username <span class="required-indicator">*</span></span><input id="user-username" required /></label>
+                <label class="field-block"><span>Role</span><select id="user-role"><option value="employee">Employee</option><option value="admin">Admin</option></select></label>
+                <label class="field-block"><span>Location</span><input id="user-location" /></label>
+                <label class="field-block"><span>Timezone</span><input id="user-timezone" /></label>
+                <label class="field-block full-width"><span>Password <span id="user-password-hint">*</span></span><input id="user-password" type="password" minlength="8" /></label>
+              </div></div>
+              <div class="form-section"><div class="form-grid form-actions-grid">
+                <button class="btn btn-ghost" type="button" id="cancel-user">Cancel</button>
+                <button class="btn btn-primary" type="submit" id="submit-user">Create Employee</button>
+              </div></div>
+            </form>
+          </div>
+        </div>
         <!-- Break allowance form is temporarily disabled. Restore this block when needed.
         <div class="task-modal-overlay" id="break-allowance-modal" style="display:none;">
           <div class="task-modal-card">
@@ -1402,7 +1424,28 @@ function renderEmployeeManagement() {
 function updateUserManagementListeners() {
   const addUserButton = document.getElementById("add-user");
   if (addUserButton) {
-    addUserButton.addEventListener("click", () => openUserModal());
+    addUserButton.addEventListener("click", () => openUserModal(null));
+  }
+
+  for (const button of document.querySelectorAll("[data-action='edit-user']")) {
+    button.addEventListener("click", () => {
+      const user = (state.employees || []).find((employee) => String(employee.id) === String(button.dataset.id));
+      if (user) openUserModal(user);
+    });
+  }
+
+  for (const button of document.querySelectorAll("[data-action='delete-user']")) {
+    button.addEventListener("click", async () => {
+      if (!confirm("Delete this employee? This cannot be undone.")) return;
+      try {
+        await deleteEmployee(button.dataset.id);
+        await loadEmployees();
+        renderEmployeeManagement();
+      } catch (error) {
+        console.error("Failed to delete employee:", error);
+        alert(error.error || "Failed to delete employee. Please try again.");
+      }
+    });
   }
 
   const refreshButton = document.getElementById("refresh-users");
@@ -1449,6 +1492,7 @@ function updateUserManagementListeners() {
   if (userForm) {
     userForm.addEventListener("submit", async (event) => {
       event.preventDefault();
+      const employeeId = document.getElementById("user-id").value;
       const payload = {
         fullName: document.getElementById("user-fullname").value,
         username: document.getElementById("user-username").value,
@@ -1456,16 +1500,18 @@ function updateUserManagementListeners() {
         role: document.getElementById("user-role").value,
         location: document.getElementById("user-location").value || null,
         timezone: document.getElementById("user-timezone").value || null,
-        dailyBreakAllowanceMinutes: parseInt(document.getElementById("user-break-allowance").value) || 60,
+        dailyBreakAllowanceMinutes: 60,
       };
 
-      if (!payload.fullName || !payload.username || !payload.password) {
+      if (!payload.fullName || !payload.username || (!employeeId && !payload.password)) {
         alert("Please fill in all required fields.");
         return;
       }
+      if (employeeId && !payload.password) delete payload.password;
 
       try {
-        await createEmployee(payload);
+        if (employeeId) await updateEmployee(employeeId, payload);
+        else await createEmployee(payload);
         await loadEmployees();
         closeUserModal();
         if (state.page === "user-management") renderEmployeeManagement();
@@ -1494,7 +1540,7 @@ function updateUserManagementListeners() {
   }
 }
 
-function openUserModal() {
+function openUserModal(user = null) {
   const modal = document.getElementById("user-modal");
   if (!modal) return;
 
@@ -1505,14 +1551,23 @@ function openUserModal() {
   const locationInput = document.getElementById("user-location");
   const timezoneInput = document.getElementById("user-timezone");
   const breakAllowanceInput = document.getElementById("user-break-allowance");
+  const idInput = document.getElementById("user-id");
+  const modalTitle = document.getElementById("user-modal-title");
+  const submitButton = document.getElementById("submit-user");
+  const passwordHint = document.getElementById("user-password-hint");
 
-  if (fullnameInput) fullnameInput.value = "";
-  if (usernameInput) usernameInput.value = "";
+  if (idInput) idInput.value = user?.id || "";
+  if (modalTitle) modalTitle.textContent = user ? "Edit Employee" : "Create New Employee";
+  if (submitButton) submitButton.textContent = user ? "Save Changes" : "Create Employee";
+  if (fullnameInput) fullnameInput.value = user?.fullName || "";
+  if (usernameInput) usernameInput.value = user?.username || "";
   if (passwordInput) passwordInput.value = "";
-  if (roleInput) roleInput.value = "employee";
-  if (locationInput) locationInput.value = state.user?.location || "";
-  if (timezoneInput) timezoneInput.value = state.user?.timezone || "";
-  if (breakAllowanceInput) breakAllowanceInput.value = "60";
+  if (passwordInput) passwordInput.required = !user;
+  if (passwordHint) passwordHint.textContent = user ? "(leave blank to keep current)" : "*";
+  if (roleInput) roleInput.value = user?.role === "user" ? "employee" : (user?.role || "employee");
+  if (locationInput) locationInput.value = user?.location || state.user?.location || "";
+  if (timezoneInput) timezoneInput.value = user?.timezone || state.user?.timezone || "";
+  if (breakAllowanceInput) breakAllowanceInput.value = user?.dailyBreakAllowanceMinutes || "60";
 
   modal.style.display = "flex";
   setTimeout(() => fullnameInput.focus(), 100);
