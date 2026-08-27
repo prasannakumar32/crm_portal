@@ -3609,6 +3609,20 @@ table.history tbody tr:hover {
   font-weight: 700;
 }
 
+.weekly-matrix-table .matrix-actions {
+  min-width: 80px;
+  text-align: center;
+}
+
+.weekly-matrix-table .matrix-actions .mini-action {
+  margin: 0 4px;
+}
+
+.weekly-matrix-table .no-data {
+  color: var(--text-secondary);
+  opacity: 0.5;
+}
+
 .weekly-matrix-table tbody tr:hover {
   background: rgba(44, 122, 122, 0.05);
 }

@@ -4,15 +4,12 @@ function createTimesheetEntryForm() {
     <div class="task-modal-card timesheet-modal-card">
       <div class="task-modal-header"><h3 id="timesheet-entry-title">New timesheet</h3><button class="icon-button" type="button" id="close-timesheet" aria-label="Close timesheet dialog">&times;</button></div>
       <form id="timesheet-entry-form" class="timesheet-manual-form">
-        <p class="timesheet-form-intro">Enter your work hours and break times for the day. You can add up to 2 breaks.</p>
+        <p class="timesheet-form-intro">Enter your work hours and total break time for the day.</p>
         <label class="field-block"><span>Date</span><input id="timesheet-date" type="date" value="${today}" required /></label>
       <div class="timesheet-time-grid">
         <label class="field-block"><span>Work Start Time</span><input name="check_in" type="time" required /></label>
         <label class="field-block"><span>Work End Time</span><input name="check_out" type="time" required /></label>
-        <label class="field-block"><span>Break 1 Start</span><input name="break_start_1" type="time" /></label>
-        <label class="field-block"><span>Break 1 End</span><input name="break_end_1" type="time" /></label>
-        <label class="field-block"><span>Break 2 Start</span><input name="break_start_2" type="time" /></label>
-        <label class="field-block"><span>Break 2 End</span><input name="break_end_2" type="time" /></label>
+        <label class="field-block"><span>Total Break Time (minutes)</span><input name="total_break_minutes" type="number" min="0" step="1" placeholder="0" /></label>
       </div>
         <label class="field-block"><span>Break reason</span><input id="timesheet-break-reason" maxlength="200" placeholder="Optional" /></label>
         <p class="form-error" id="timesheet-form-error" role="alert"></p>
@@ -78,28 +75,35 @@ function openTimesheetDayEditor(dateKey) {
   const events = (historyDay?.events || []).filter((event) => ["check_in", "break_start", "break_end", "check_out"].includes(event.type));
   if (!events.length) return;
 
-  const eventFields = {
-    check_in: "check_in",
-    break_start: "break_start_1",
-    break_end: "break_end_1",
-    check_out: "check_out",
-  };
-  const typeCounters = {};
   entryForm.reset();
   entryForm.dataset.mode = "edit-day";
   entryForm._editEvents = events;
   document.getElementById("timesheet-entry-title").textContent = "Edit timesheet";
   document.getElementById("timesheet-date").value = dateKey;
-  for (const event of events) {
-    const occurrence = typeCounters[event.type] || 0;
-    typeCounters[event.type] = occurrence + 1;
-    let fieldName = eventFields[event.type];
-    if (event.type === "break_start") fieldName = occurrence === 0 ? "break_start_1" : "break_start_2";
-    if (event.type === "break_end") fieldName = occurrence === 0 ? "break_end_1" : "break_end_2";
-    const input = entryForm.querySelector(`[name="${fieldName}"]`);
-    if (input) input.value = timesheetInputParts(event.timestampUtc).time;
-    if (event.type === "break_start" && event.reason) document.getElementById("timesheet-break-reason").value = event.reason;
+  
+  // Populate work start/end times
+  const checkInEvent = events.find(e => e.type === "check_in");
+  const checkOutEvent = events.find(e => e.type === "check_out");
+  if (checkInEvent) {
+    entryForm.querySelector("[name=check_in]").value = timesheetInputParts(checkInEvent.timestampUtc).time;
   }
+  if (checkOutEvent) {
+    entryForm.querySelector("[name=check_out]").value = timesheetInputParts(checkOutEvent.timestampUtc).time;
+  }
+  
+  // Calculate and populate total break minutes
+  const breakSeconds = historyDay?.breakSeconds || 0;
+  const breakMinutes = Math.round(breakSeconds / 60);
+  if (breakMinutes > 0) {
+    entryForm.querySelector("[name=total_break_minutes]").value = breakMinutes;
+  }
+  
+  // Populate break reason if exists
+  const breakStartEvent = events.find(e => e.type === "break_start");
+  if (breakStartEvent?.reason) {
+    document.getElementById("timesheet-break-reason").value = breakStartEvent.reason;
+  }
+  
   entryCard.hidden = false;
   const newButton = document.getElementById("new-timesheet");
   if (newButton) newButton.hidden = true;
@@ -146,28 +150,25 @@ function attachTimesheetFormListeners() {
     if (errorBox) errorBox.textContent = "";
     const formData = new FormData(entryForm);
     const date = document.getElementById("timesheet-date").value;
-    const entries = [
-      ["check_in", "check-in"],
-      ["break_start_1", "break-start"],
-      ["break_end_1", "break-end"],
-      ["break_start_2", "break-start"],
-      ["break_end_2", "break-end"],
-      ["check_out", "check-out"],
-    ];
-    const values = entries.filter(([field]) => formData.get(field)).map(([field, action]) => ({
-      action,
-      value: formData.get(field),
-    }));
-    const timeValues = Object.fromEntries(entries.map(([field]) => [field, formData.get(field) || ""]));
-    const orderedFields = ["check_in", "break_start_1", "break_end_1", "break_start_2", "break_end_2", "check_out"];
-    const orderedTimes = orderedFields.filter((field) => timeValues[field]).map((field) => timeValues[field]);
-    const isChronological = orderedTimes.every((time, index) => index === 0 || time > orderedTimes[index - 1]);
-    if (!values.length) {
-      if (errorBox) errorBox.textContent = "Enter at least one time before saving.";
+    const checkInTime = formData.get("check_in");
+    const checkOutTime = formData.get("check_out");
+    const totalBreakMinutes = parseInt(formData.get("total_break_minutes") || "0");
+    
+    if (!checkInTime || !checkOutTime) {
+      if (errorBox) errorBox.textContent = "Work start and end times are required.";
       return;
     }
-    if (!isChronological) {
-      if (errorBox) errorBox.textContent = "Times must be in chronological order.";
+    if (checkInTime >= checkOutTime) {
+      if (errorBox) errorBox.textContent = "Work end time must be after work start time.";
+      return;
+    }
+    
+    // Validate break time doesn't exceed work duration
+    const checkInDate = new Date(`${date}T${checkInTime}`);
+    const checkOutDate = new Date(`${date}T${checkOutTime}`);
+    const workDurationMinutes = (checkOutDate - checkInDate) / (60 * 1000);
+    if (totalBreakMinutes >= workDurationMinutes) {
+      if (errorBox) errorBox.textContent = "Break time cannot exceed work duration.";
       return;
     }
 
@@ -176,30 +177,58 @@ function attachTimesheetFormListeners() {
     try {
       const reason = document.getElementById("timesheet-break-reason").value.trim();
       const editEvents = entryForm._editEvents || [];
-      const existingByType = {};
+      
+      // Delete existing events for this day
       for (const existing of editEvents) {
-        if (!existingByType[existing.type]) existingByType[existing.type] = [];
-        existingByType[existing.type].push(existing);
+        await apiJson(`/api/attendance/events/${existing.id}`, { method: "DELETE" });
       }
-      const typeCounters = {};
-      for (const [field, action] of entries) {
-        const value = timeValues[field];
-        const type = action.replace("-", "_");
-        const existing = (existingByType[type] || [])[typeCounters[type] || 0];
-        typeCounters[type] = (typeCounters[type] || 0) + 1;
-        if (value) {
-          const payload = {
-            timestampUtc: new Date(`${date}T${value}`).toISOString(),
-            ...(action === "break-start" ? { reason: reason || "Break" } : {}),
-          };
-          await apiJson(existing ? `/api/attendance/events/${existing.id}` : `/api/attendance/${action}`, {
-            method: existing ? "PUT" : "POST",
-            body: JSON.stringify(payload),
-          });
-        } else if (existing) {
-          await apiJson(`/api/attendance/events/${existing.id}`, { method: "DELETE" });
-        }
+      
+      // Create new events in chronological order
+      const checkInPayload = {
+        timestampUtc: new Date(`${date}T${checkInTime}`).toISOString(),
+      };
+      await apiJson(`/api/attendance/check-in`, {
+        method: "POST",
+        body: JSON.stringify(checkInPayload),
+      });
+      
+      // If break time is specified, create break events in the middle of work period
+      if (totalBreakMinutes > 0) {
+        const checkInTimeMs = new Date(`${date}T${checkInTime}`).getTime();
+        const checkOutTimeMs = new Date(`${date}T${checkOutTime}`).getTime();
+        const workDurationMs = checkOutTimeMs - checkInTimeMs;
+        
+        // Start break at midpoint of work period
+        const breakStartTimeMs = checkInTimeMs + (workDurationMs / 2) - (totalBreakMinutes * 60 * 1000 / 2);
+        const breakStartPayload = {
+          timestampUtc: new Date(breakStartTimeMs).toISOString(),
+          reason: reason || "Break",
+        };
+        await apiJson(`/api/attendance/break-start`, {
+          method: "POST",
+          body: JSON.stringify(breakStartPayload),
+        });
+        
+        // End break after break duration
+        const breakEndTimeMs = breakStartTimeMs + (totalBreakMinutes * 60 * 1000);
+        const breakEndPayload = {
+          timestampUtc: new Date(breakEndTimeMs).toISOString(),
+        };
+        await apiJson(`/api/attendance/break-end`, {
+          method: "POST",
+          body: JSON.stringify(breakEndPayload),
+        });
       }
+      
+      // Create check-out event last
+      const checkOutPayload = {
+        timestampUtc: new Date(`${date}T${checkOutTime}`).toISOString(),
+      };
+      await apiJson(`/api/attendance/check-out`, {
+        method: "POST",
+        body: JSON.stringify(checkOutPayload),
+      });
+      
       await loadToday();
       await loadHistory();
       renderTimesheets();
@@ -293,16 +322,17 @@ function createWeeklyMatrixView() {
     date.setDate(monday.getDate() + index);
     const dateKey = date.toISOString().slice(0, 10);
     const dayData = (state.historyData || []).find(d => d.date === dateKey);
+    const hasData = dayData && dayData.events && dayData.events.length > 0;
     
     return {
       day,
       date: dateKey,
       workStart: dayData?.checkInUtc ? formatTime(dayData.checkInUtc, zone) : '—',
       workEnd: dayData?.checkOutUtc ? formatTime(dayData.checkOutUtc, zone) : '—',
-      breakStart: dayData?.events?.find(e => e.type === 'break_start') ? formatTime(dayData.events.find(e => e.type === 'break_start').timestampUtc, zone) : '—',
-      breakEnd: dayData?.events?.find(e => e.type === 'break_end') ? formatTime(dayData.events.find(e => e.type === 'break_end').timestampUtc, zone) : '—',
       breakTime: dayData ? formatDuration(dayData.breakSeconds) : '—',
-      workTime: dayData ? formatDuration(dayData.workedSeconds) : '—'
+      workTime: dayData ? formatDuration(dayData.workedSeconds) : '—',
+      hasData,
+      eventIds: hasData ? dayData.events.map(e => e.id).join(',') : ''
     };
   });
 
@@ -312,10 +342,18 @@ function createWeeklyMatrixView() {
       <td class="matrix-date">${day.date}</td>
       <td class="matrix-time">${day.workStart}</td>
       <td class="matrix-time">${day.workEnd}</td>
-      <td class="matrix-time">${day.breakStart}</td>
-      <td class="matrix-time">${day.breakEnd}</td>
       <td class="matrix-duration">${day.breakTime}</td>
       <td class="matrix-duration work-time">${day.workTime}</td>
+      <td class="matrix-actions">
+        ${day.hasData ? `
+          <button type="button" class="mini-action icon-action" title="Edit" data-edit-timesheet-day="${day.date}">
+            <span class="material-symbols-outlined">edit</span>
+          </button>
+          <button type="button" class="mini-action danger icon-action" title="Delete" data-delete-timesheet-day="${day.eventIds}">
+            <span class="material-symbols-outlined">delete</span>
+          </button>
+        ` : '<span class="no-data">—</span>'}
+      </td>
     </tr>
   `).join('');
 
@@ -329,10 +367,9 @@ function createWeeklyMatrixView() {
             <th>Date</th>
             <th>Work Start</th>
             <th>Work End</th>
-            <th>Break Start</th>
-            <th>Break End</th>
-            <th>Break Time</th>
+            <th>Total Break Time</th>
             <th>Net Work Time</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>${matrixRows}</tbody>
@@ -343,16 +380,6 @@ function createWeeklyMatrixView() {
 
 function createTimesheetsTemplate() {
   const zone = getUserTimeZone();
-  const sortedRows = [...state.historyData].sort((a, b) => new Date(a.date) - new Date(b.date));
-  const historyRows = sortedRows.map((day) => `
-      <tr>
-        <td>${day.date}</td>
-        <td>${day.checkInUtc ? formatTime(day.checkInUtc, zone) : "—"}</td>
-        <td>${day.checkOutUtc ? formatTime(day.checkOutUtc, zone) : "—"}</td>
-        <td>${formatDuration(day.breakSeconds)}</td>
-        <td>${formatDuration(day.workedSeconds)}</td>
-      </tr>
-    `).join("");
   const selectedPeriod = normalizeDashboardPeriod(state.dashboardPeriod);
   const periodDesc = selectedPeriod === "week" ? "this week" : selectedPeriod === "month" ? "this month" : "today";
   const dayDurations = computeDurationsClient(state.todayEvents);
@@ -380,14 +407,6 @@ function createTimesheetsTemplate() {
           </div>
         </section>
         ${state.dashboardPeriod === "week" ? createWeeklyMatrixView() : ''}
-        <div class="card history-card">
-          <h2>Daily timesheet history</h2>
-          <table class="history">
-            <thead><tr><th>Date</th><th>Check in (${zone})</th><th>Check out (${zone})</th><th>Break</th><th>Worked</th><th>Actions</th></tr></thead>
-            <tbody id="history-body">${historyRows}</tbody>
-          </table>
-          <p class="empty-note" id="history-empty" style="display:${state.historyData.length ? "none" : "block"};">No history yet.</p>
-        </div>
       `;
 }
 
