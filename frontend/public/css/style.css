@@ -412,6 +412,20 @@ button {
   color: #be123c;
 }
 
+.mini-action.icon-action {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mini-action.icon-action .material-symbols-outlined {
+  font-size: 17px;
+  line-height: 1;
+}
+
 .chevron {
   margin-left: auto;
   font-size: 28px;
@@ -3520,6 +3534,87 @@ table.history td.day-cell {
 
 table.history tbody tr:hover {
   background: var(--bg);
+}
+
+/* ============ WEEKLY MATRIX TABLE ============ */
+
+.weekly-matrix-card {
+  background: linear-gradient(180deg, #fbfdfd 0%, #f0f9ff 100%);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow);
+}
+
+.matrix-table-container {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.weekly-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.weekly-matrix-table thead {
+  background: linear-gradient(180deg, #e8f4f8 0%, #dceef2 100%);
+}
+
+.weekly-matrix-table th {
+  text-align: left;
+  padding: 14px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--border);
+}
+
+.weekly-matrix-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.weekly-matrix-table .matrix-day {
+  font-family: var(--font-body);
+  font-weight: 600;
+  color: var(--primary);
+  min-width: 100px;
+}
+
+.weekly-matrix-table .matrix-date {
+  font-family: var(--font-body);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.weekly-matrix-table .matrix-time {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.weekly-matrix-table .matrix-duration {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.weekly-matrix-table .matrix-duration.work-time {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.weekly-matrix-table tbody tr:hover {
+  background: rgba(44, 122, 122, 0.05);
+}
+
+.weekly-matrix-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .footnote {

@@ -36,12 +36,12 @@ function createHolidaysTemplate() {
     if (!dateParts) return "";
     const actions = state.user?.role === "admin" && holiday.created ? `
           <div class="holiday-actions">
-            <button class="btn btn-ghost" type="button" data-action="edit-holiday" data-id="${holiday.id}">Edit</button>
-            <button class="btn btn-danger" type="button" data-action="delete-holiday" data-id="${holiday.id}">Delete</button>
+            <button class="mini-action icon-action" type="button" title="Edit holiday" aria-label="Edit holiday" data-action="edit-holiday" data-id="${holiday.id}"><span class="material-symbols-outlined" aria-hidden="true">edit</span></button>
+            <button class="mini-action danger icon-action" type="button" title="Delete holiday" aria-label="Delete holiday" data-action="delete-holiday" data-id="${holiday.id}"><span class="material-symbols-outlined" aria-hidden="true">delete</span></button>
           </div>` : "";
     const publicActions = state.user?.role === "admin" && !holiday.created ? `
           <div class="holiday-actions">
-            <button class="btn btn-ghost" type="button" data-action="edit-public-holiday" data-date="${holiday.date}">Edit</button>
+            <button class="mini-action icon-action" type="button" title="Edit public holiday" aria-label="Edit public holiday" data-action="edit-public-holiday" data-date="${holiday.date}"><span class="material-symbols-outlined" aria-hidden="true">edit</span></button>
           </div>` : "";
     return `
       <div class="holiday-row">

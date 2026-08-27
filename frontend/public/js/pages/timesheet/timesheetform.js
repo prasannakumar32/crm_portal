@@ -4,15 +4,15 @@ function createTimesheetEntryForm() {
     <div class="task-modal-card timesheet-modal-card">
       <div class="task-modal-header"><h3 id="timesheet-entry-title">New timesheet</h3><button class="icon-button" type="button" id="close-timesheet" aria-label="Close timesheet dialog">&times;</button></div>
       <form id="timesheet-entry-form" class="timesheet-manual-form">
-        <p class="timesheet-form-intro">Record your day in order: check in, start a break, end the break to continue working, then check out.</p>
+        <p class="timesheet-form-intro">Enter your work hours and break times for the day. You can add up to 2 breaks.</p>
         <label class="field-block"><span>Date</span><input id="timesheet-date" type="date" value="${today}" required /></label>
       <div class="timesheet-time-grid">
-        <label class="field-block"><span>1. Check in</span><input name="check_in" type="time" /></label>
-        <label class="field-block"><span>2. Break start</span><input name="break_start_1" type="time" /></label>
-        <label class="field-block"><span>3. Break end / continue work</span><input name="break_end_1" type="time" /></label>
-        <label class="field-block"><span>4. Break start again</span><input name="break_start_2" type="time" /></label>
-        <label class="field-block"><span>5. Break end / continue work</span><input name="break_end_2" type="time" /></label>
-        <label class="field-block"><span>6. Check out</span><input name="check_out" type="time" /></label>
+        <label class="field-block"><span>Work Start Time</span><input name="check_in" type="time" required /></label>
+        <label class="field-block"><span>Work End Time</span><input name="check_out" type="time" required /></label>
+        <label class="field-block"><span>Break 1 Start</span><input name="break_start_1" type="time" /></label>
+        <label class="field-block"><span>Break 1 End</span><input name="break_end_1" type="time" /></label>
+        <label class="field-block"><span>Break 2 Start</span><input name="break_start_2" type="time" /></label>
+        <label class="field-block"><span>Break 2 End</span><input name="break_end_2" type="time" /></label>
       </div>
         <label class="field-block"><span>Break reason</span><input id="timesheet-break-reason" maxlength="200" placeholder="Optional" /></label>
         <p class="form-error" id="timesheet-form-error" role="alert"></p>
@@ -280,6 +280,67 @@ function attachTimesheetFormListeners() {
   });
 }
 
+function createWeeklyMatrixView() {
+  const zone = getUserTimeZone();
+  const today = new Date();
+  const currentDay = today.getDay();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1));
+  
+  const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const weekData = weekDays.map((day, index) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + index);
+    const dateKey = date.toISOString().slice(0, 10);
+    const dayData = (state.historyData || []).find(d => d.date === dateKey);
+    
+    return {
+      day,
+      date: dateKey,
+      workStart: dayData?.checkInUtc ? formatTime(dayData.checkInUtc, zone) : '—',
+      workEnd: dayData?.checkOutUtc ? formatTime(dayData.checkOutUtc, zone) : '—',
+      breakStart: dayData?.events?.find(e => e.type === 'break_start') ? formatTime(dayData.events.find(e => e.type === 'break_start').timestampUtc, zone) : '—',
+      breakEnd: dayData?.events?.find(e => e.type === 'break_end') ? formatTime(dayData.events.find(e => e.type === 'break_end').timestampUtc, zone) : '—',
+      breakTime: dayData ? formatDuration(dayData.breakSeconds) : '—',
+      workTime: dayData ? formatDuration(dayData.workedSeconds) : '—'
+    };
+  });
+
+  const matrixRows = weekData.map(day => `
+    <tr class="matrix-row">
+      <td class="matrix-day">${day.day}</td>
+      <td class="matrix-date">${day.date}</td>
+      <td class="matrix-time">${day.workStart}</td>
+      <td class="matrix-time">${day.workEnd}</td>
+      <td class="matrix-time">${day.breakStart}</td>
+      <td class="matrix-time">${day.breakEnd}</td>
+      <td class="matrix-duration">${day.breakTime}</td>
+      <td class="matrix-duration work-time">${day.workTime}</td>
+    </tr>
+  `).join('');
+
+  return `<div class="card weekly-matrix-card">
+    <div class="card-heading"><h2>Weekly Timesheet Matrix</h2></div>
+    <div class="matrix-table-container">
+      <table class="weekly-matrix-table">
+        <thead>
+          <tr>
+            <th>Day</th>
+            <th>Date</th>
+            <th>Work Start</th>
+            <th>Work End</th>
+            <th>Break Start</th>
+            <th>Break End</th>
+            <th>Break Time</th>
+            <th>Net Work Time</th>
+          </tr>
+        </thead>
+        <tbody>${matrixRows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
 function createTimesheetsTemplate() {
   const zone = getUserTimeZone();
   const sortedRows = [...state.historyData].sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -318,6 +379,7 @@ function createTimesheetsTemplate() {
             </div>
           </div>
         </section>
+        ${state.dashboardPeriod === "week" ? createWeeklyMatrixView() : ''}
         <div class="card history-card">
           <h2>Daily timesheet history</h2>
           <table class="history">

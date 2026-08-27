@@ -20,8 +20,8 @@ function createWorkSchedulesTemplate() {
         <span>${item.status}</span>
       </div>
       <div class="schedule-item schedule-actions">
-        <button class="mini-action" type="button" data-action="edit-schedule" data-id="${item.id}">Edit</button>
-        <button class="mini-action danger" type="button" data-action="delete-schedule" data-id="${item.id}">Delete</button>
+        <button class="mini-action icon-action" type="button" title="Edit schedule" aria-label="Edit schedule" data-action="edit-schedule" data-id="${item.id}"><span class="material-symbols-outlined" aria-hidden="true">edit</span></button>
+        <button class="mini-action danger icon-action" type="button" title="Delete schedule" aria-label="Delete schedule" data-action="delete-schedule" data-id="${item.id}"><span class="material-symbols-outlined" aria-hidden="true">delete</span></button>
       </div>
     </div>
   `).join("");

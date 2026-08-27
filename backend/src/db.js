@@ -16,7 +16,11 @@ async function getEmployees() {
   const db = await getDb();
   const collections = getEmployeeCollections(db);
   const records = (await Promise.all(collections.map((collection) => collection.find({}).toArray()))).flat();
-  const unique = new Map(records.map((employee) => [employee._id.toString(), employee]));
+  const unique = new Map();
+  for (const employee of records) {
+    const id = employee._id.toString();
+    if (!unique.has(id)) unique.set(id, employee);
+  }
   return [...unique.values()].map(normalizeEmployee);
 }
 

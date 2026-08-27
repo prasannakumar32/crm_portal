@@ -40,12 +40,12 @@ async function attachNames(tasks) {
 
 router.get("/employees", async (req, res) => {
   const employees = await db.getEmployees();
-  res.json({ employees: employees.map((employee) => ({ id: employee.id, fullName: employee.fullName, role: employee.role, location: employee.location, timezone: employee.timezone, dailyBreakAllowanceMinutes: employee.dailyBreakAllowanceMinutes || 60 })) });
+  res.json({ employees: employees.map((employee) => ({ id: employee.id, username: employee.username, fullName: employee.fullName, role: employee.role, location: employee.location, timezone: employee.timezone, dailyBreakAllowanceMinutes: employee.dailyBreakAllowanceMinutes || 60 })) });
 });
 
 router.get("/users", async (req, res) => {
   const employees = await db.getEmployees();
-  res.json({ users: employees.map((employee) => ({ id: employee.id, fullName: employee.fullName, role: employee.role, location: employee.location, timezone: employee.timezone, dailyBreakAllowanceMinutes: employee.dailyBreakAllowanceMinutes || 60 })) });
+  res.json({ users: employees.map((employee) => ({ id: employee.id, username: employee.username, fullName: employee.fullName, role: employee.role, location: employee.location, timezone: employee.timezone, dailyBreakAllowanceMinutes: employee.dailyBreakAllowanceMinutes || 60 })) });
 });
 
 router.get("/projects", async (req, res) => {

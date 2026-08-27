@@ -17,8 +17,8 @@ function createTimeOffTemplate() {
       </div>
     ` : `
       <div class="row-admin-actions">
-        <button type="button" class="mini-action" data-action="edit-leave" data-id="${item.id}">Edit</button>
-        <button type="button" class="mini-action danger" data-action="delete-leave" data-id="${item.id}">Delete</button>
+        <button type="button" class="mini-action icon-action" title="Edit leave" aria-label="Edit leave" data-action="edit-leave" data-id="${item.id}"><span class="material-symbols-outlined" aria-hidden="true">edit</span></button>
+        <button type="button" class="mini-action danger icon-action" title="Delete leave" aria-label="Delete leave" data-action="delete-leave" data-id="${item.id}"><span class="material-symbols-outlined" aria-hidden="true">delete</span></button>
       </div>
     `;
     return `<div class="holiday-row">
@@ -38,7 +38,6 @@ function createTimeOffTemplate() {
       <h2>Leave requests</h2>
       <div class="admin-inline-actions">
         <button class="btn btn-primary" type="button" id="add-leave">New Leave Request</button>
-        <button class="btn btn-ghost" type="button" id="refresh-leaves">↻ Refresh</button>
       </div>
     </div>
     <div class="holiday-list">${leaveRows || '<p class="empty-note">No leave requests yet.</p>'}</div>

@@ -205,10 +205,6 @@ function createDashboardTemplate() {
     const category = item.type || "Leave";
     const end = item.endDate ? new Date(item.endDate) : start;
     const range = item.endDate ? `${formatDate(item.startDate, getUserTimeZone())} – ${formatDate(item.endDate, getUserTimeZone())}` : formatDate(item.startDate, getUserTimeZone());
-    const adminActions = state.user?.role === "admin" ? `<div class="row-admin-actions">
-      <button type="button" class="mini-action" data-action="edit-leave" data-id="${item.id}">Edit</button>
-      <button type="button" class="mini-action danger" data-action="delete-leave" data-id="${item.id}">Delete</button>
-    </div>` : "";
     return `<div class="holiday-row">
       <span class="holiday-date">${month}<br/>${day}</span>
       <div>
@@ -216,7 +212,6 @@ function createDashboardTemplate() {
         <div class="holiday-place">${category} · ${item.location || dbLocation}</div>
         <div class="holiday-meta">${range}</div>
         <div class="holiday-status status-${item.status?.toLowerCase() || "approved"}">${item.status || "Approved"}</div>
-        ${adminActions}
       </div>
     </div>`;
   }).join("");
@@ -273,12 +268,12 @@ function createDashboardTemplate() {
           <section class="card leave-summary-card">
             <div class="card-title-row">
               <div>
-                <h2>Time off</h2>
+                <h2>Leave request</h2>
                 <span class="card-subtitle">Your upcoming leave requests</span>
               </div>
-              <button class="icon-button dashboard-card-link" type="button" data-dashboard-page="timeoff" aria-label="View all time off">›</button>
+              <button class="icon-button dashboard-card-link" type="button" data-dashboard-page="timeoff" aria-label="View all Leave request ">›</button>
             </div>
-            <div class="holiday-list">${renderLeaveRows(timeOffItems.slice(0, 4)) || '<p class="empty-note">No upcoming time off.</p>'}</div>
+            <div class="holiday-list">${renderLeaveRows(timeOffItems.slice(0, 4)) || '<p class="empty-note">No upcoming Leave request .</p>'}</div>
           </section>
           <section class="card leave-summary-card">
             <div class="card-title-row">
@@ -633,15 +628,6 @@ function attachDashboardListeners() {
     });
   }
 
-  const refreshButton = document.getElementById("refresh-leaves");
-  if (refreshButton) {
-    refreshButton.addEventListener("click", async () => {
-      await loadLeaves();
-      if (state.page === "timeoff") renderTimeOff();
-      else renderDashboard();
-    });
-  }
-
   const holidayRows = document.querySelectorAll("[data-action='edit-leave']");
   for (const btn of holidayRows) {
     btn.addEventListener("click", () => openLeaveModal(btn.dataset.id));
@@ -768,34 +754,6 @@ function attachDashboardListeners() {
   if (scheduleOverlay) {
     scheduleOverlay.addEventListener("click", (event) => {
       if (event.target === scheduleOverlay) closeScheduleModal();
-    });
-  }
-
-  const form = document.getElementById("leave-form");
-  if (form) {
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const leaveId = Number(document.getElementById("leave-id").value || Date.now());
-      const nextRecord = {
-        id: leaveId || Date.now(),
-        name: document.getElementById("leave-name").value.trim(),
-        type: document.getElementById("leave-type").value || "Holiday",
-        startDate: document.getElementById("leave-date").value,
-        endDate: document.getElementById("leave-end-date").value || document.getElementById("leave-date").value,
-        location: document.getElementById("leave-location").value.trim() || state.user?.location || "Australia",
-        reason: document.getElementById("leave-reason").value.trim(),
-        status: document.getElementById("leave-status").value || "Approved",
-      };
-      if (!nextRecord.name || !nextRecord.startDate || !nextRecord.endDate) return;
-      const existing = state.leaveData.find((row) => row.id === nextRecord.id);
-      if (existing) {
-        Object.assign(existing, nextRecord);
-      } else {
-        state.leaveData.push(nextRecord);
-      }
-      closeLeaveModal();
-      if (state.page === "timeoff") renderTimeOff();
-      else renderDashboard();
     });
   }
 
@@ -1085,7 +1043,7 @@ function renderHistory() {
       const events = (day.events || []).filter((event) => ["check_in", "break_start", "break_end", "check_out"].includes(event.type));
       const firstEvent = events[0];
       const eventIds = events.map((event) => event.id).join(",");
-      const dayActions = events.length ? `<span class="timesheet-history-day-actions"><button class="mini-action" type="button" data-edit-timesheet-day="${day.date}">Edit day</button><button class="mini-action danger" type="button" data-delete-timesheet-day="${eventIds}">Delete day</button></span>` : "";
+      const dayActions = events.length ? `<span class="timesheet-history-day-actions"><button class="mini-action icon-action" type="button" title="Edit day" aria-label="Edit day" data-edit-timesheet-day="${day.date}"><span class="material-symbols-outlined" aria-hidden="true">edit</span></button><button class="mini-action danger icon-action" type="button" title="Delete day" aria-label="Delete day" data-delete-timesheet-day="${eventIds}"><span class="material-symbols-outlined" aria-hidden="true">delete</span></button></span>` : "";
       actionCell.innerHTML = dayActions || "—";
       tr.append(actionCell);
     }
@@ -1327,8 +1285,8 @@ function createEmployeeManagementTemplate() {
       <td>${user.location || "—"}</td>
       <td>${user.timezone || "—"}</td>
       <td>
-        <button type="button" class="mini-action" data-action="edit-user" data-id="${user.id}">Edit</button>
-        <button type="button" class="mini-action" data-action="delete-user" data-id="${user.id}">Delete</button>
+        <button type="button" class="mini-action icon-action" title="Edit employee" aria-label="Edit employee" data-action="edit-user" data-id="${user.id}"><span class="material-symbols-outlined" aria-hidden="true">edit</span></button>
+        <button type="button" class="mini-action danger icon-action" title="Delete employee" aria-label="Delete employee" data-action="delete-user" data-id="${user.id}"><span class="material-symbols-outlined" aria-hidden="true">delete</span></button>
       </td>
     </tr>
   `).join("");
@@ -1338,7 +1296,6 @@ function createEmployeeManagementTemplate() {
             <h2>Employee Management</h2>
             <div class="admin-inline-actions">
               <button class="btn btn-primary" type="button" id="add-user">Create New Employee</button>
-              <button class="btn btn-ghost" type="button" id="refresh-users">↻ Refresh</button>
             </div>
           </div>
           <div class="users-table-container">
@@ -1445,14 +1402,6 @@ function updateUserManagementListeners() {
         console.error("Failed to delete employee:", error);
         alert(error.error || "Failed to delete employee. Please try again.");
       }
-    });
-  }
-
-  const refreshButton = document.getElementById("refresh-users");
-  if (refreshButton) {
-    refreshButton.addEventListener("click", async () => {
-      await loadEmployees();
-      if (state.page === "user-management") renderEmployeeManagement();
     });
   }
 

@@ -17,6 +17,8 @@ const SCRIPT_REGISTRY = Object.freeze([
   "js/pages/work-schedules/workscheduleform.js",
 ]);
 
+const LOCAL_ASSET_VERSION = "20260826-2";
+
 const PAGE_DEFINITIONS = Object.freeze({
   dashboard: { render: () => renderDashboard() },
   timesheets: { render: () => renderTimesheets() },
@@ -34,7 +36,7 @@ function getPageDefinition(page) {
 function loadScript(source) {
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = source;
+    script.src = source.startsWith("js/") ? `${source}?v=${LOCAL_ASSET_VERSION}` : source;
     script.onload = resolve;
     script.onerror = () => reject(new Error(`Unable to load ${source}`));
     document.head.appendChild(script);
