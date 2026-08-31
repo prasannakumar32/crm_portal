@@ -112,10 +112,11 @@ function renderHolidays() {
           await deleteLeave(button.dataset.id);
           await loadLeaves();
           state.holidayEditTarget = null;
+          showSuccess("Holiday deleted successfully.");
           renderHolidays();
         } catch (error) {
           console.error("Failed to delete holiday:", error);
-          alert("Failed to delete holiday. Please try again.");
+          showErrorNotification("Failed to delete holiday. Please try again.");
         }
       });
     }

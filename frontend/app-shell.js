@@ -9,6 +9,7 @@ function renderAppShell() {
 </head>
 <body>
   <div id="root"></div>
+  <div id="app-notification-host" class="app-notification-host" aria-live="polite" aria-atomic="true"></div>
   <script src="/js/core/app.js?v=20260827-3"></script>
 </body>
 </html>`;

@@ -42,6 +42,40 @@ function setError(message) {
   }
 }
 
+function ensureNotificationHost() {
+  let host = document.getElementById("app-notification-host");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "app-notification-host";
+    host.className = "app-notification-host";
+    host.setAttribute("aria-live", "polite");
+    host.setAttribute("aria-atomic", "true");
+    document.body.appendChild(host);
+  }
+  return host;
+}
+
+function showNotification(message, type = "success", duration = 3200) {
+  const host = ensureNotificationHost();
+  const toast = document.createElement("div");
+  toast.className = `app-toast ${type}`;
+  toast.textContent = message;
+  host.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("show"));
+  window.setTimeout(() => {
+    toast.classList.remove("show");
+    window.setTimeout(() => toast.remove(), 250);
+  }, duration);
+}
+
+function showSuccess(message) {
+  showNotification(message, "success");
+}
+
+function showErrorNotification(message) {
+  showNotification(message || "Something went wrong.", "error");
+}
+
 function setPage(page, updateHash = true) {
   state.page = page;
   if (page === "login") {
@@ -620,11 +654,12 @@ function attachDashboardListeners() {
       try {
         await updateLeave(target, { status: "Approved" });
         await loadLeaves();
+        showSuccess("Leave request approved.");
         if (state.page === "timeoff") renderTimeOff();
         else renderDashboard();
       } catch (error) {
         console.error("Failed to approve leave:", error);
-        alert("Failed to approve leave. Please try again.");
+        showErrorNotification("Failed to approve leave. Please try again.");
       }
     });
   }
@@ -636,27 +671,35 @@ function attachDashboardListeners() {
       try {
         await updateLeave(target, { status: "Rejected" });
         await loadLeaves();
+        showSuccess("Leave request rejected.");
         if (state.page === "timeoff") renderTimeOff();
         else renderDashboard();
       } catch (error) {
         console.error("Failed to reject leave:", error);
-        alert("Failed to reject leave. Please try again.");
+        showErrorNotification("Failed to reject leave. Please try again.");
       }
     });
   }
 
   const deleteRows = document.querySelectorAll("[data-action='delete-leave']");
   for (const btn of deleteRows) {
+    if (btn.dataset.deleteBound === "true") continue;
+    btn.dataset.deleteBound = "true";
     btn.addEventListener("click", async () => {
+      if (btn.dataset.deleting === "true") return;
       const target = btn.dataset.id;
+      btn.dataset.deleting = "true";
       try {
         await deleteLeave(target);
         await loadLeaves();
+        showSuccess("Leave request deleted.");
         if (state.page === "timeoff") renderTimeOff();
         else renderDashboard();
       } catch (error) {
         console.error("Failed to delete leave:", error);
-        alert("Failed to delete leave. Please try again.");
+        showErrorNotification("Failed to delete leave. Please try again.");
+      } finally {
+        btn.dataset.deleting = "false";
       }
     });
   }
@@ -768,20 +811,27 @@ function attachDashboardListeners() {
 
   const deleteHolidayRows = document.querySelectorAll("[data-action='delete-leave']");
   for (const btn of deleteHolidayRows) {
+    if (btn.dataset.deleteBound === "true") continue;
+    btn.dataset.deleteBound = "true";
     btn.addEventListener("click", async () => {
+      if (btn.dataset.deleting === "true") return;
       const target = btn.dataset.id;
       if (!confirm("Are you sure you want to delete this leave request?")) {
         return;
       }
+      btn.dataset.deleting = "true";
       try {
         await apiJson(`/api/attendance/leaves/${target}`, {
           method: "DELETE",
         });
         await loadLeaves();
+        showSuccess("Leave request deleted.");
         renderDashboard();
       } catch (error) {
         console.error("Failed to delete leave:", error);
-        alert("Failed to delete leave. Please try again.");
+        showErrorNotification("Failed to delete leave. Please try again.");
+      } finally {
+        btn.dataset.deleting = "false";
       }
     });
   }
@@ -813,7 +863,7 @@ function attachDashboardListeners() {
         const otherInput = document.getElementById("break-reason-other");
         const customValue = otherInput ? otherInput.value.trim() : "";
         if (!customValue) {
-          alert("Please tell us the reason for your break.");
+          showErrorNotification("Please tell us the reason for your break.");
           if (otherInput) otherInput.focus();
           return;
         }
@@ -1022,7 +1072,7 @@ async function performAction(endpoint, extraPayload = {}) {
     updateDashboardValues();
     await loadHistory();
   } catch (err) {
-    alert(err.error || "That action couldn't be completed.");
+    showErrorNotification(err.error || "That action couldn't be completed.");
   } finally {
     setBusy(false);
   }
@@ -1165,8 +1215,10 @@ function attachLeaveModalListeners() {
       try {
         if (leaveId) {
           await updateLeave(leaveId, payload);
+          showSuccess("Leave request updated.");
         } else {
           await createLeave(payload);
+          showSuccess("Leave request created.");
         }
         await loadLeaves();
         closeLeaveModal();
@@ -1179,7 +1231,7 @@ function attachLeaveModalListeners() {
         }
       } catch (error) {
         console.error("Failed to save leave:", error);
-        alert("Failed to save leave. Please try again.");
+        showErrorNotification("Failed to save leave. Please try again.");
       } finally {
         leaveForm.dataset.saving = "false";
       }
@@ -1425,10 +1477,11 @@ function updateUserManagementListeners() {
       try {
         await deleteEmployee(button.dataset.id);
         await loadEmployees();
+        showSuccess("Employee deleted successfully.");
         renderEmployeeManagement();
       } catch (error) {
         console.error("Failed to delete employee:", error);
-        alert(error.error || "Failed to delete employee. Please try again.");
+        showErrorNotification(error.error || "Failed to delete employee. Please try again.");
       }
     });
   }
@@ -1481,20 +1534,25 @@ function updateUserManagementListeners() {
       };
 
       if (!payload.fullName || !payload.username || (!employeeId && !payload.password)) {
-        alert("Please fill in all required fields.");
+        showErrorNotification("Please fill in all required fields.");
         return;
       }
       if (employeeId && !payload.password) delete payload.password;
 
       try {
-        if (employeeId) await updateEmployee(employeeId, payload);
-        else await createEmployee(payload);
+        if (employeeId) {
+          await updateEmployee(employeeId, payload);
+          showSuccess("Employee updated successfully.");
+        } else {
+          await createEmployee(payload);
+          showSuccess("Employee created successfully.");
+        }
         await loadEmployees();
         closeUserModal();
         if (state.page === "user-management") renderEmployeeManagement();
       } catch (error) {
         console.error("Failed to create employee:", error);
-        alert(error.error || "Failed to create employee. Please try again.");
+        showErrorNotification(error.error || "Failed to create employee. Please try again.");
       }
     });
   }

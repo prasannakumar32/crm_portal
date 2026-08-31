@@ -298,10 +298,12 @@ function attachTimesheetFormListeners() {
       
       await loadToday();
       await loadHistory();
+      showSuccess("Timesheet saved successfully.");
       renderTimesheets();
     } catch (error) {
       console.error("[Timesheet] Save failed", error);
       showFormError(error.error || error.message || "Unable to save the timesheet.");
+      showErrorNotification(error.error || error.message || "Unable to save the timesheet.");
       if (submitButton) submitButton.disabled = false;
     }
   });
@@ -383,9 +385,11 @@ function attachTimesheetFormListeners() {
       });
       await loadToday();
       await loadHistory();
+      showSuccess("Timesheet updated successfully.");
       renderTimesheets();
     } catch (error) {
       if (editError) editError.textContent = error.error || "Unable to update this event.";
+      showErrorNotification(error.error || "Unable to update this event.");
       if (saveButton) saveButton.disabled = false;
     }
   });
@@ -574,9 +578,10 @@ async function deleteTimesheetDay(eventIds) {
     }
     await loadToday();
     await loadHistory();
+    showSuccess("Timesheet deleted successfully.");
     renderTimesheets();
   } catch (error) {
-    alert(error.error || "Unable to delete the daily timesheet.");
+    showErrorNotification(error.error || "Unable to delete the daily timesheet.");
   }
 }
 

@@ -370,13 +370,13 @@ async function saveTask() {
   };
 
   if (!payload.title) {
-    alert("Task title is required.");
+    showErrorNotification("Task title is required.");
     titleInput.focus();
     return;
   }
 
   if (payload.title.length < 3) {
-    alert("Task title must be at least 3 characters long.");
+    showErrorNotification("Task title must be at least 3 characters long.");
     titleInput.focus();
     return;
   }
@@ -388,18 +388,20 @@ async function saveTask() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      showSuccess("Task updated successfully.");
     } else {
       await apiJson("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      showSuccess("Task created successfully.");
     }
 
     await refreshTasks();
     closeTaskModal();
   } catch (error) {
-    alert("Failed to save task. Please try again.");
+    showErrorNotification("Failed to save task. Please try again.");
     console.error("Save task error:", error);
   }
 }
@@ -433,31 +435,31 @@ async function saveProject() {
   };
 
   if (!payload.name) {
-    alert("Project name is required.");
+    showErrorNotification("Project name is required.");
     nameInput.focus();
     return;
   }
 
   if (payload.name.length < 3) {
-    alert("Project name must be at least 3 characters long.");
+    showErrorNotification("Project name must be at least 3 characters long.");
     nameInput.focus();
     return;
   }
 
   if (!payload.clientName) {
-    alert("Client name is required.");
+    showErrorNotification("Client name is required.");
     clientNameInput.focus();
     return;
   }
 
   if (!payload.managerName) {
-    alert("Manager name is required.");
+    showErrorNotification("Manager name is required.");
     managerNameInput.focus();
     return;
   }
 
   if (!payload.stack) {
-    alert("Stack used is required.");
+    showErrorNotification("Stack used is required.");
     stackInput.focus();
     return;
   }
@@ -467,6 +469,7 @@ async function saveProject() {
     await loadProjects();
     refreshTasks();
     closeProjectModal();
+    showSuccess("Project created successfully.");
     
     // Update task modal project dropdown
     const taskProjectInput = document.getElementById("task-project");
@@ -475,7 +478,7 @@ async function saveProject() {
       taskProjectInput.innerHTML = `<option value="">General</option>${projects.map((project) => `<option value="${project.id}">${project.name} (${project.clientName || 'No Client'})</option>`).join("")}`;
     }
   } catch (error) {
-    alert("Failed to create project. Please try again.");
+    showErrorNotification("Failed to create project. Please try again.");
     console.error("Create project error:", error);
   }
 }
@@ -632,7 +635,7 @@ async function submitTaskComment() {
   if (!text) return;
   const message = text.value.trim();
   if (!message) {
-    alert("Enter a comment before posting.");
+    showErrorNotification("Enter a comment before posting.");
     return;
   }
   await postTaskComment(state.currentTask.id, message);
@@ -641,6 +644,7 @@ async function submitTaskComment() {
   state.currentTask = response.task;
   renderTaskDetail();
   await refreshTasks();
+  showSuccess("Comment added successfully.");
 }
 
 async function submitTaskAttachment() {
@@ -651,7 +655,7 @@ async function submitTaskAttachment() {
   const name = nameInput.value.trim();
   const url = urlInput.value.trim();
   if (!name || !url) {
-    alert("Both attachment name and link are required.");
+    showErrorNotification("Both attachment name and link are required.");
     return;
   }
 
@@ -662,6 +666,7 @@ async function submitTaskAttachment() {
   state.currentTask = response.task;
   renderTaskDetail();
   await refreshTasks();
+  showSuccess("Attachment added successfully.");
 }
 
 async function initTasksPage() {
