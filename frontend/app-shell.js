@@ -9,7 +9,7 @@ function renderAppShell() {
 </head>
 <body>
   <div id="root"></div>
-  <script src="/js/core/app.js?v=20260826-2"></script>
+  <script src="/js/core/app.js?v=20260827-3"></script>
 </body>
 </html>`;
 }

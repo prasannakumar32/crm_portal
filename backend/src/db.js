@@ -1,375 +1,580 @@
 
 
-const { getDb } = require("./mongo");
-const { ObjectId } = require("mongodb");
+const { supabase } = require("./supabase");
 
-function getEmployeeCollections(db) {
-  return [db.collection("employees"), db.collection("users")];
+// Convert snake_case to camelCase
+function toCamelCase(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(toCamelCase);
+  
+  return Object.keys(obj).reduce((acc, key) => {
+    const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+    acc[camelKey] = typeof obj[key] === 'object' && obj[key] !== null ? toCamelCase(obj[key]) : obj[key];
+    return acc;
+  }, {});
 }
 
 function normalizeEmployee(employee) {
   if (!employee) return null;
-  return { ...employee, role: employee.role === "user" ? "employee" : employee.role, id: employee._id.toString() };
+  const camel = toCamelCase(employee);
+  return { ...camel, role: camel.role === "user" ? "employee" : camel.role };
+}
+
+function normalizeEvent(event) {
+  if (!event) return null;
+  return toCamelCase(event);
+}
+
+function normalizeTask(task) {
+  if (!task) return null;
+  return toCamelCase(task);
+}
+
+function normalizeProject(project) {
+  if (!project) return null;
+  return toCamelCase(project);
+}
+
+function normalizeLeave(leave) {
+  if (!leave) return null;
+  return toCamelCase(leave);
 }
 
 async function getEmployees() {
-  const db = await getDb();
-  const collections = getEmployeeCollections(db);
-  const records = (await Promise.all(collections.map((collection) => collection.find({}).toArray()))).flat();
+  const { data: employeesData, error: employeesError } = await supabase
+    .from('employees')
+    .select('*');
+  
+  const { data: usersData, error: usersError } = await supabase
+    .from('users')
+    .select('*');
+  
+  if (employeesError || usersError) {
+    console.error('Error fetching employees:', employeesError || usersError);
+    return [];
+  }
+  
+  const allRecords = [...(employeesData || []), ...(usersData || [])];
   const unique = new Map();
-  for (const employee of records) {
-    const id = employee._id.toString();
-    if (!unique.has(id)) unique.set(id, employee);
+  for (const employee of allRecords) {
+    if (!unique.has(employee.id)) unique.set(employee.id, employee);
   }
   return [...unique.values()].map(normalizeEmployee);
 }
 
 async function findEmployeeByUsername(username) {
-  const db = await getDb();
   const needle = username.trim().toLowerCase();
-  for (const employees of getEmployeeCollections(db)) {
-    const employee = await employees.findOne({ normalizedUsername: needle });
-    if (employee) return normalizeEmployee(employee);
-  }
+  
+  // Check employees table first
+  const { data: employee, error: empError } = await supabase
+    .from('employees')
+    .select('*')
+    .eq('normalized_username', needle)
+    .single();
+  
+  if (employee && !empError) return normalizeEmployee(employee);
+  
+  // Check users table
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('normalized_username', needle)
+    .single();
+  
+  if (user && !userError) return normalizeEmployee(user);
+  
   return null;
 }
 
 async function findEmployeeById(id) {
   if (!id) return null;
-  const db = await getDb();
-  try {
-    for (const employees of getEmployeeCollections(db)) {
-      const employee = await employees.findOne({ _id: new ObjectId(id) });
-      if (employee) return normalizeEmployee(employee);
-    }
-    return null;
-  } catch (err) {
-    return null;
-  }
+  
+  // Check employees table first
+  const { data: employee, error: empError } = await supabase
+    .from('employees')
+    .select('*')
+    .eq('id', id)
+    .single();
+  
+  if (employee && !empError) return normalizeEmployee(employee);
+  
+  // Check users table
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', id)
+    .single();
+  
+  if (user && !userError) return normalizeEmployee(user);
+  
+  return null;
 }
 
 async function createEmployee({ username, passwordHash, fullName, role = "employee", location = null, timezone = null, dailyBreakAllowanceMinutes = 60 }) {
-  const db = await getDb();
   const normalizedUsername = username.trim().toLowerCase();
   const doc = {
     username: username.trim(),
-    normalizedUsername,
-    passwordHash,
-    fullName: fullName.trim(),
+    normalized_username: normalizedUsername,
+    password_hash: passwordHash,
+    full_name: fullName.trim(),
     role,
     location: location || null,
     timezone: timezone || null,
-    dailyBreakAllowanceMinutes: dailyBreakAllowanceMinutes || 60,
-    createdAt: new Date().toISOString(),
+    daily_break_allowance_minutes: dailyBreakAllowanceMinutes || 60,
   };
-  const employees = db.collection("employees");
-  const r = await employees.insertOne(doc);
-  return normalizeEmployee(await employees.findOne({ _id: r.insertedId }));
+  
+  const { data, error } = await supabase
+    .from('employees')
+    .insert(doc)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error creating employee:', error);
+    return null;
+  }
+  
+  return normalizeEmployee(data);
 }
 
 async function updateEmployee(id, { username, passwordHash, fullName, role, location, timezone }) {
-  const db = await getDb();
-  try {
-    const updates = {
-      username: username.trim(),
-      normalizedUsername: username.trim().toLowerCase(),
-      fullName: fullName.trim(),
-      role,
-      location: location || null,
-      timezone: timezone || null,
-      updatedAt: new Date().toISOString(),
-    };
-    if (passwordHash) updates.passwordHash = passwordHash;
-    for (const employees of getEmployeeCollections(db)) {
-      const result = await employees.findOneAndUpdate(
-        { _id: new ObjectId(id) },
-        { $set: updates },
-        { returnDocument: "after" }
-      );
-      if (result.value) return normalizeEmployee(result.value);
-    }
-    return null;
-  } catch (err) {
+  const updates = {
+    username: username.trim(),
+    normalized_username: username.trim().toLowerCase(),
+    full_name: fullName.trim(),
+    role,
+    location: location || null,
+    timezone: timezone || null,
+  };
+  if (passwordHash) updates.password_hash = passwordHash;
+  
+  const { data, error } = await supabase
+    .from('employees')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error updating employee:', error);
     return null;
   }
+  
+  return normalizeEmployee(data);
 }
 
 async function deleteEmployee(id) {
-  const db = await getDb();
-  try {
-    for (const employees of getEmployeeCollections(db)) {
-      const result = await employees.deleteOne({ _id: new ObjectId(id) });
-      if (result.deletedCount > 0) return true;
-    }
-    return false;
-  } catch (err) {
-    return false;
-  }
+  // Try employees table first
+  const { error: empError } = await supabase
+    .from('employees')
+    .delete()
+    .eq('id', id);
+  
+  if (!empError) return true;
+  
+  // Try users table
+  const { error: userError } = await supabase
+    .from('users')
+    .delete()
+    .eq('id', id);
+  
+  return !userError;
 }
 
 async function getAllEvents() {
-  const db = await getDb();
-  const events = await db.collection("attendance").find({}).sort({ timestampUtc: 1 }).toArray();
-  return events.map((e) => ({ ...e, id: e._id.toString() }));
+  const { data, error } = await supabase
+    .from('attendance')
+    .select('*')
+    .order('timestamp_utc', { ascending: true });
+  
+  if (error) {
+    console.error('Error fetching events:', error);
+    return [];
+  }
+  
+  return (data || []).map(normalizeEvent);
 }
 
 async function getEventsForEmployee(employeeId) {
-  const db = await getDb();
   const uid = String(employeeId);
-  const events = await db.collection("attendance").find({ $or: [{ employeeId: uid }, { userId: uid }] }).sort({ timestampUtc: 1 }).toArray();
-  return events.map((e) => ({ ...e, id: e._id.toString() }));
+  const { data, error } = await supabase
+    .from('attendance')
+    .select('*')
+    .or(`employee_id.eq.${uid},user_id.eq.${uid}`)
+    .order('timestamp_utc', { ascending: true });
+  
+  if (error) {
+    console.error('Error fetching employee events:', error);
+    return [];
+  }
+  
+  return (data || []).map(normalizeEvent);
 }
 
 async function addEvent({ employeeId, type, timestampUtc, latitude, longitude, address, reason }) {
-  const db = await getDb();
   const event = {
-    employeeId: String(employeeId),
+    employee_id: String(employeeId),
     type,
-    timestampUtc,
+    timestamp_utc: timestampUtc,
     latitude: typeof latitude === "number" ? latitude : null,
     longitude: typeof longitude === "number" ? longitude : null,
     address: address || null,
     reason: typeof reason === "string" ? reason.trim().slice(0, 200) || null : null,
   };
-  const r = await db.collection("attendance").insertOne(event);
-  const e = await db.collection("attendance").findOne({ _id: r.insertedId });
-  return { ...e, id: e._id.toString() };
+  
+  const { data, error } = await supabase
+    .from('attendance')
+    .insert(event)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error adding event:', error);
+    return null;
+  }
+  
+  return normalizeEvent(data);
 }
 
 async function updateAttendanceEvent(employeeId, eventId, { timestampUtc, reason }) {
-  const db = await getDb();
-  let objectId;
-  try {
-    objectId = new ObjectId(eventId);
-  } catch {
+  const updates = {
+    timestamp_utc: timestampUtc,
+    reason: typeof reason === "string" ? reason.trim().slice(0, 200) || null : null,
+  };
+  
+  const { data, error } = await supabase
+    .from('attendance')
+    .update(updates)
+    .eq('id', eventId)
+    .or(`employee_id.eq.${String(employeeId)},user_id.eq.${String(employeeId)}`)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error updating event:', error);
     return null;
   }
-
-  const result = await db.collection("attendance").updateOne(
-    { _id: objectId, $or: [{ employeeId: String(employeeId) }, { userId: String(employeeId) }] },
-    { $set: { timestampUtc, reason: typeof reason === "string" ? reason.trim().slice(0, 200) || null : null, updatedAt: new Date().toISOString() } }
-  );
-  if (!result.matchedCount) return null;
-  const event = await db.collection("attendance").findOne({ _id: objectId });
-  return { ...event, id: event._id.toString() };
+  
+  return normalizeEvent(data);
 }
 
 async function deleteAttendanceEvent(employeeId, eventId) {
-  const db = await getDb();
-  let objectId;
-  try {
-    objectId = new ObjectId(eventId);
-  } catch {
-    return false;
-  }
-
-  const result = await db.collection("attendance").deleteOne({
-    _id: objectId,
-    $or: [{ employeeId: String(employeeId) }, { userId: String(employeeId) }],
-  });
-  return result.deletedCount > 0;
+  const { error } = await supabase
+    .from('attendance')
+    .delete()
+    .eq('id', eventId)
+    .or(`employee_id.eq.${String(employeeId)},user_id.eq.${String(employeeId)}`);
+  
+  return !error;
 }
 
 async function getProjects() {
-  const db = await getDb();
-  const projects = await db.collection("projects").find({}).sort({ createdAt: -1 }).toArray();
-  return projects.map((project) => ({ ...project, id: project._id.toString() }));
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    console.error('Error fetching projects:', error);
+    return [];
+  }
+  
+  return (data || []).map(normalizeProject);
 }
 
 async function createProject({ name, clientName, managerName, description, stack, location, ownerId }) {
-  const db = await getDb();
   const doc = {
     name: String(name).trim(),
-    clientName: String(clientName).trim(),
-    managerName: String(managerName).trim(),
+    client_name: String(clientName).trim(),
+    manager_name: String(managerName).trim(),
     description: String(description || "").trim(),
     stack: String(stack).trim(),
     location: location || "India",
-    ownerId: ownerId || null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    owner_id: ownerId || null,
   };
-  const r = await db.collection("projects").insertOne(doc);
-  const project = await db.collection("projects").findOne({ _id: r.insertedId });
-  return { ...project, id: project._id.toString() };
+  
+  const { data, error } = await supabase
+    .from('projects')
+    .insert(doc)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error creating project:', error);
+    return null;
+  }
+  
+  return normalizeProject(data);
 }
 
 async function getTasks({ assigneeId = null, status = null, projectId = null } = {}) {
-  const db = await getDb();
-  const query = {};
+  let query = supabase.from('tasks').select('*');
+  
   if (assigneeId) {
-    query.$or = [{ assigneeId: String(assigneeId) }, { creatorId: String(assigneeId) }];
+    const uid = String(assigneeId);
+    query = query.or(`assignee_id.eq.${uid},creator_id.eq.${uid}`);
   }
   if (status) {
-    query.status = status;
+    query = query.eq('status', status);
   }
   if (projectId) {
-    query.projectId = projectId;
+    query = query.eq('project_id', projectId);
   }
-  const tasks = await db.collection("tasks").find(query).sort({ updatedAt: -1, createdAt: -1 }).toArray();
-  return tasks.map((task) => ({ ...task, id: task._id.toString() }));
+  
+  const { data, error } = await query.order('updated_at', { ascending: false }).order('created_at', { ascending: false });
+  
+  if (error) {
+    console.error('Error fetching tasks:', error);
+    return [];
+  }
+  
+  return (data || []).map(normalizeTask);
 }
 
 async function getTaskById(id) {
   if (!id) return null;
-  const db = await getDb();
-  try {
-    const task = await db.collection("tasks").findOne({ _id: new ObjectId(id) });
-    if (!task) return null;
-    return { ...task, id: task._id.toString() };
-  } catch (err) {
+  
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('id', id)
+    .single();
+  
+  if (error) {
+    console.error('Error fetching task:', error);
     return null;
   }
+  
+  return normalizeTask(data);
 }
 
 async function createTask({ title, description, projectId, status, assigneeId, creatorId, priority, dueDate, comments, attachments }) {
-  const db = await getDb();
   const doc = {
     title: String(title).trim(),
     description: String(description || "").trim(),
-    projectId: projectId || null,
+    project_id: projectId || null,
     status: status || "Backlog",
-    assigneeId: assigneeId || null,
-    creatorId: creatorId || null,
+    assignee_id: assigneeId || null,
+    creator_id: creatorId || null,
     priority: priority || "Normal",
-    dueDate: dueDate || null,
+    due_date: dueDate || null,
     comments: comments || [],
     attachments: attachments || [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
   };
-  const r = await db.collection("tasks").insertOne(doc);
-  const task = await db.collection("tasks").findOne({ _id: r.insertedId });
-  return { ...task, id: task._id.toString() };
+  
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert(doc)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error creating task:', error);
+    return null;
+  }
+  
+  return normalizeTask(data);
 }
 
 async function updateTask(id, updates = {}) {
   if (!id) return null;
-  const db = await getDb();
   const allowedUpdates = ["title", "description", "status", "assigneeId", "dueDate", "projectId", "priority"];
-  const updateFields = { updatedAt: new Date().toISOString() };
+  const updateFields = {};
+  
   for (const key of allowedUpdates) {
     if (updates[key] !== undefined) {
-      updateFields[key] = updates[key] === "" ? null : updates[key];
+      const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase(); // camelCase to snake_case
+      updateFields[dbKey] = updates[key] === "" ? null : updates[key];
     }
   }
-  try {
-    const result = await db.collection("tasks").findOneAndUpdate(
-      { _id: new ObjectId(id) },
-      { $set: updateFields },
-      { returnDocument: "after" }
-    );
-    if (!result.value) return null;
-    return { ...result.value, id: result.value._id.toString() };
-  } catch (err) {
+  
+  const { data, error } = await supabase
+    .from('tasks')
+    .update(updateFields)
+    .eq('id', id)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error updating task:', error);
     return null;
   }
+  
+  return normalizeTask(data);
 }
 
 async function addTaskComment(id, comment) {
   if (!id) return null;
-  const db = await getDb();
-  try {
-    const result = await db.collection("tasks").findOneAndUpdate(
-      { _id: new ObjectId(id) },
-      { $push: { comments: comment }, $set: { updatedAt: new Date().toISOString() } },
-      { returnDocument: "after" }
-    );
-    if (!result.value) return null;
-    return { ...result.value, id: result.value._id.toString() };
-  } catch (err) {
+  
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('comments')
+    .eq('id', id)
+    .single();
+  
+  if (error) {
+    console.error('Error fetching task for comment:', error);
     return null;
   }
+  
+  const updatedComments = [...(data.comments || []), comment];
+  
+  const { data: updatedTask, error: updateError } = await supabase
+    .from('tasks')
+    .update({ comments: updatedComments })
+    .eq('id', id)
+    .select()
+    .single();
+  
+  if (updateError) {
+    console.error('Error adding comment:', updateError);
+    return null;
+  }
+  
+  return normalizeTask(updatedTask);
 }
 
 async function addTaskAttachment(id, attachment) {
   if (!id) return null;
-  const db = await getDb();
-  try {
-    const result = await db.collection("tasks").findOneAndUpdate(
-      { _id: new ObjectId(id) },
-      { $push: { attachments: attachment }, $set: { updatedAt: new Date().toISOString() } },
-      { returnDocument: "after" }
-    );
-    if (!result.value) return null;
-    return { ...result.value, id: result.value._id.toString() };
-  } catch (err) {
+  
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('attachments')
+    .eq('id', id)
+    .single();
+  
+  if (error) {
+    console.error('Error fetching task for attachment:', error);
     return null;
   }
+  
+  const updatedAttachments = [...(data.attachments || []), attachment];
+  
+  const { data: updatedTask, error: updateError } = await supabase
+    .from('tasks')
+    .update({ attachments: updatedAttachments })
+    .eq('id', id)
+    .select()
+    .single();
+  
+  if (updateError) {
+    console.error('Error adding attachment:', updateError);
+    return null;
+  }
+  
+  return normalizeTask(updatedTask);
 }
 
 async function getLeaves() {
-  const db = await getDb();
-  try {
-    const leaves = await db.collection("leaves").find({}).toArray();
-    return leaves.map((l) => ({ ...l, id: l._id.toString() }));
-  } catch (err) {
-    // If collection doesn't exist, return empty array
+  const { data, error } = await supabase
+    .from('leaves')
+    .select('*');
+  
+  if (error) {
+    console.error('Error fetching leaves:', error);
     return [];
   }
+  
+  return (data || []).map(normalizeLeave);
 }
 
 async function getLeaveById(id) {
-  const db = await getDb();
-  try {
-    const leave = await db.collection("leaves").findOne({ _id: new ObjectId(id) });
-    return leave ? { ...leave, id: leave._id.toString() } : null;
-  } catch (err) {
+  const { data, error } = await supabase
+    .from('leaves')
+    .select('*')
+    .eq('id', id)
+    .single();
+  
+  if (error) {
+    console.error('Error fetching leave:', error);
     return null;
   }
+  
+  return normalizeLeave(data);
 }
 
 async function createLeave(leaveData) {
-  const db = await getDb();
   const doc = {
-    ...leaveData,
-    createdAt: new Date().toISOString(),
+    employee_id: leaveData.employeeId,
+    employee_name: leaveData.employeeName,
+    start_date: leaveData.startDate,
+    end_date: leaveData.endDate || null,
+    type: leaveData.type || 'Leave',
+    reason: leaveData.reason || null,
+    status: leaveData.status || 'Pending',
   };
-  const result = await db.collection("leaves").insertOne(doc);
-  const leave = await db.collection("leaves").findOne({ _id: result.insertedId });
-  return { ...leave, id: leave._id.toString() };
+  
+  const { data, error } = await supabase
+    .from('leaves')
+    .insert(doc)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error creating leave:', error);
+    return null;
+  }
+  
+  return normalizeLeave(data);
 }
 
 async function updateLeave(id, updateData) {
-  const db = await getDb();
-  try {
-    const result = await db.collection("leaves").findOneAndUpdate(
-      { _id: new ObjectId(id) },
-      { $set: { ...updateData, updatedAt: new Date().toISOString() } },
-      { returnDocument: "after" }
-    );
-    if (!result.value) return null;
-    return { ...result.value, id: result.value._id.toString() };
-  } catch (err) {
+  const updates = {
+    employee_id: updateData.employeeId,
+    employee_name: updateData.employeeName,
+    start_date: updateData.startDate,
+    end_date: updateData.endDate || null,
+    type: updateData.type || 'Leave',
+    reason: updateData.reason || null,
+    status: updateData.status || 'Pending',
+  };
+  
+  const { data, error } = await supabase
+    .from('leaves')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error updating leave:', error);
     return null;
   }
+  
+  return normalizeLeave(data);
 }
 
 async function deleteLeave(id) {
-  const db = await getDb();
-  try {
-    const result = await db.collection("leaves").deleteOne({ _id: new ObjectId(id) });
-    return result.deletedCount > 0;
-  } catch (err) {
-    return false;
-  }
+  const { error } = await supabase
+    .from('leaves')
+    .delete()
+    .eq('id', id);
+  
+  return !error;
 }
 
 async function updateEmployeeBreakAllowance(employeeId, dailyBreakAllowanceMinutes) {
-  const db = await getDb();
-  try {
-    for (const employees of getEmployeeCollections(db)) {
-      const result = await employees.findOneAndUpdate(
-        { _id: new ObjectId(employeeId) },
-        { $set: { dailyBreakAllowanceMinutes, updatedAt: new Date().toISOString() } },
-        { returnDocument: "after" }
-      );
-      if (result.value) return normalizeEmployee(result.value);
-    }
-    return null;
-  } catch (err) {
-    return null;
-  }
+  // Try employees table first
+  const { data, error: empError } = await supabase
+    .from('employees')
+    .update({ daily_break_allowance_minutes: dailyBreakAllowanceMinutes })
+    .eq('id', employeeId)
+    .select()
+    .single();
+  
+  if (data && !empError) return normalizeEmployee(data);
+  
+  // Try users table
+  const { data: userData, error: userError } = await supabase
+    .from('users')
+    .update({ daily_break_allowance_minutes: dailyBreakAllowanceMinutes })
+    .eq('id', employeeId)
+    .select()
+    .single();
+  
+  if (userData && !userError) return normalizeEmployee(userData);
+  
+  return null;
 }
 
 module.exports = {

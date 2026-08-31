@@ -12,7 +12,7 @@ const taskRoutes = require("./src/tasks");
 const holidayRoutes = require("./src/holidays");
 const { renderAppShell } = require("../frontend/app-shell");
 const { requireAuth } = require("./src/middleware");
-const { connect: connectMongo } = require("./src/mongo");
+const { testConnection } = require("./src/supabase");
 
 const app = express();
 const PORT = process.env.PORT || 3333;
@@ -90,36 +90,36 @@ app.use((req, res) => {
 });
 
 async function startServer() {
-  if (!process.env.MONGO_URI && !process.env.MONGODB_URI) {
-    console.error("\n❌ STARTUP ERROR: MONGO_URI/MONGODB_URI is not set");
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("\n❌ STARTUP ERROR: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are not set");
     console.error("─".repeat(60));
     console.error("REQUIRED SETUP STEPS:");
-    console.error("1. Open your MongoDB Atlas cluster");
-    console.error("2. Go to: Database → Database Users");
-    console.error("3. Copy the connection string from MongoDB Atlas");
-    console.error("4. Set MONGO_URI=<your-connection-string> or MONGODB_URI=<your-connection-string>");
-    console.error("5. Replace <USERNAME> and <PASSWORD> with your MongoDB user credentials");
+    console.error("1. Create a Supabase project at https://supabase.com");
+    console.error("2. Go to Project Settings → API");
+    console.error("3. Copy the Project URL and Service Role Key");
+    console.error("4. Set SUPABASE_URL=<your-project-url>");
+    console.error("5. Set SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>");
     console.error("─".repeat(60));
     process.exit(1);
   }
 
   try {
     console.log("\n🚀 Starting CRM Portal Server...");
-    await connectMongo();
+    await testConnection();
     app.listen(PORT, () => {
       console.log(`\n✅ CRM portal running at http://localhost:${PORT}`);
       console.log("📱 Open your browser and navigate to the URL above");
       console.log("─".repeat(60));
     });
   } catch (error) {
-    console.error("\n❌ STARTUP ERROR: Failed to connect to MongoDB");
+    console.error("\n❌ STARTUP ERROR: Failed to connect to Supabase");
     console.error("─".repeat(60));
     console.error("Error Details:", error.message);
     console.error("─".repeat(60));
     console.error("\nTROUBLESHOOTING:");
-    console.error("• Check your .env file has correct MONGO_URI");
-    console.error("• Verify credentials in MongoDB Atlas Database Users");
-    console.error("• Ensure your IP is whitelisted in Network Access");
+    console.error("• Check your .env file has correct SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY");
+    console.error("• Verify your Supabase project is active");
+    console.error("• Run the SQL schema in supabase-schema.sql to create tables");
     console.error("• Check internet connection");
     console.error("─".repeat(60));
     process.exit(1);

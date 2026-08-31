@@ -50,10 +50,19 @@ router.get("/", async (req, res) => {
   try {
     const response = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/${country}`);
     if (!response.ok) throw new Error(`Holiday provider returned ${response.status}`);
-    const holidays = await response.json();
+    const responseBody = await response.text();
+    if (!responseBody.trim()) throw new Error("Holiday provider returned an empty response");
+
+    let holidays;
+    try {
+      holidays = JSON.parse(responseBody);
+    } catch {
+      throw new Error("Holiday provider returned invalid JSON");
+    }
+    if (!Array.isArray(holidays)) throw new Error("Holiday provider returned an invalid holiday list");
+
     return res.json({ country, countryName: COUNTRY_NAMES[country], year, source: "calendar", holidays });
   } catch (error) {
-    console.warn(`Holiday calendar unavailable for ${country}/${year}: ${error.message}`);
     return res.json({ country, countryName: COUNTRY_NAMES[country], year, source: "fallback", holidays: fallbackHolidays(country, year) });
   }
 });

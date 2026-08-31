@@ -84,6 +84,9 @@ const state = {
   teamUsers: [],
   employees: [],
   users: [],
+  employeeTimesheetTarget: null,
+  employeeTimesheetData: [],
+  employeeTimesheetPeriod: "week",
   taskFilter: { status: null, projectId: null, assigneeId: null },
   taskView: "board",
   currentTask: null,
@@ -108,12 +111,12 @@ const state = {
 
 function formatTime(iso, timeZone) {
   const normalizedZone = normalizeTimeZone(timeZone);
-  return new Intl.DateTimeFormat("en-GB", {
+  return new Intl.DateTimeFormat("en-US", {
     timeZone: normalizedZone,
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-    hour12: false,
+    hour12: true,
   }).format(new Date(iso));
 }
 

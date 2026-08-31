@@ -105,6 +105,15 @@ async function loadHistory(period = state.dashboardPeriod) {
   renderHistory();
 }
 
+async function loadEmployeeHistory(employeeId, period = state.employeeTimesheetPeriod) {
+  const normalized = normalizeDashboardPeriod(period);
+  const data = await apiJson(`/api/attendance/history/employee/${encodeURIComponent(employeeId)}?period=${normalized}`);
+  state.employeeTimesheetTarget = data.employee;
+  state.employeeTimesheetData = data.days || [];
+  state.employeeTimesheetPeriod = normalized;
+  return data;
+}
+
 async function loadTask(id) {
   if (!id) return null;
   return apiJson(`/api/tasks/${id}`);

@@ -161,7 +161,6 @@ function createPageShell(title, contentHtml) {
         <div><h1>${title}</h1></div>
         <div class="header-actions">
           <span class="current-time" id="current-time-label">—</span>
-          <span class="login-time" id="login-time-label">Logged in for ${loggedInDisplay}</span>
           <span class="user-chip">Signed in as <strong>${state.user.fullName}</strong></span>
           <span class="badge location-badge">${dbLocation} · ${zoneAbbr}</span>
         </div>
@@ -310,21 +309,6 @@ function createDashboardTemplate() {
             </div>
           </div>
         </section>
-        <section class="two-column">
-          <div class="card timeline-card">
-            <h2>Today's timeline</h2>
-            <ul class="timeline" id="timeline"></ul>
-            <p class="empty-note" id="timeline-empty">No activity yet today — check in to get started.</p>
-          </div>
-          <div class="card history-card">
-            <h2>History (${periodDesc})</h2>
-            <table class="history">
-              <thead><tr><th>Date</th><th>Check in (${zoneAbbr})</th><th>Check out (${zoneAbbr})</th><th>Break</th><th>Worked</th></tr></thead>
-              <tbody id="history-body"></tbody>
-            </table>
-            <p class="empty-note" id="history-empty" style="display:none;">No history yet.</p>
-          </div>
-        </section>
         <section class="clock-board" style="display: none;">
           <div class="clock-zone">
             <span class="zone-label">${zoneAbbr}</span>
@@ -458,8 +442,6 @@ function renderDashboard() {
     root.innerHTML = createPageShell("Dashboard", createDashboardTemplate());
     attachDashboardListeners();
     updateDashboardValues();
-    renderTimeline();
-    renderHistory();
     renderDailyHoursChart();
   }).catch(() => {
     // Fallback: render with empty leaves data
@@ -467,8 +449,6 @@ function renderDashboard() {
     root.innerHTML = createPageShell("Dashboard", createDashboardTemplate());
     attachDashboardListeners();
     updateDashboardValues();
-    renderTimeline();
-    renderHistory();
     renderDailyHoursChart();
   });
 }
@@ -1105,10 +1085,6 @@ function tickClock() {
     timeLabel.textContent = `${zone} ${getDisplayTimeZoneLabel()}`;
   }
 
-  const loginLabel = document.getElementById("login-time-label");
-  if (loginLabel) {
-    loginLabel.textContent = getLoginTimeText();
-  }
 }
 
 function setFlapText(container, text) {
@@ -1285,6 +1261,7 @@ function createEmployeeManagementTemplate() {
       <td>${user.location || "—"}</td>
       <td>${user.timezone || "—"}</td>
       <td>
+        <button type="button" class="mini-action icon-action" title="View timesheet" aria-label="View timesheet" data-action="view-timesheet" data-id="${user.id}"><span class="material-symbols-outlined" aria-hidden="true">visibility</span></button>
         <button type="button" class="mini-action icon-action" title="Edit employee" aria-label="Edit employee" data-action="edit-user" data-id="${user.id}"><span class="material-symbols-outlined" aria-hidden="true">edit</span></button>
         <button type="button" class="mini-action danger icon-action" title="Delete employee" aria-label="Delete employee" data-action="delete-user" data-id="${user.id}"><span class="material-symbols-outlined" aria-hidden="true">delete</span></button>
       </td>
@@ -1378,6 +1355,75 @@ function renderEmployeeManagement() {
   });
 }
 
+function createEmployeeTimesheetTemplate() {
+  const employee = state.employeeTimesheetTarget;
+  const period = normalizeDashboardPeriod(state.employeeTimesheetPeriod);
+  const days = state.employeeTimesheetData || [];
+  const totals = days.reduce((summary, day) => ({
+    workedSeconds: summary.workedSeconds + Number(day.workedSeconds || 0),
+    breakSeconds: summary.breakSeconds + Number(day.breakSeconds || 0),
+  }), { workedSeconds: 0, breakSeconds: 0 });
+  const rows = days.map((day) => `<tr>
+    <td>${formatDate(day.date, employee.timezone)}</td>
+    <td>${day.checkInUtc ? formatTime(day.checkInUtc, employee.timezone) : "—"}</td>
+    <td>${day.checkOutUtc ? formatTime(day.checkOutUtc, employee.timezone) : "—"}</td>
+    <td>${formatDuration(day.breakSeconds)}</td>
+    <td>${formatDuration(day.workedSeconds)}</td>
+  </tr>`).join("");
+
+  return `<section class="card employee-timesheet-card">
+    <div class="employee-timesheet-header">
+      <div>
+        <button class="btn btn-ghost" type="button" id="back-to-employees">Back to Employee Management</button>
+        <h2>${employee.fullName}'s Timesheet</h2>
+        <p>${employee.username} · ${employee.role} · ${employee.location || "Location unavailable"} · ${employee.timezone || "Australia/Sydney"}</p>
+      </div>
+      <div class="period-tabs employee-timesheet-tabs" role="tablist" aria-label="Select employee timesheet period">
+        <button class="tab ${period === "day" ? "active" : ""}" type="button" data-employee-period="day">Today</button>
+        <button class="tab ${period === "week" ? "active" : ""}" type="button" data-employee-period="week">Week</button>
+        <button class="tab ${period === "month" ? "active" : ""}" type="button" data-employee-period="month">Month</button>
+      </div>
+    </div>
+    <div class="employee-timesheet-summary">
+      <div><span>Worked</span><strong>${formatDuration(totals.workedSeconds)}</strong></div>
+      <div><span>Breaks</span><strong>${formatDuration(totals.breakSeconds)}</strong></div>
+      <div><span>Days recorded</span><strong>${days.length}</strong></div>
+    </div>
+    <div class="users-table-container">
+      <table class="users-table employee-timesheet-table">
+        <thead><tr><th>Date</th><th>Check In</th><th>Check Out</th><th>Break</th><th>Worked</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="5" class="empty-note">No timesheet records found for this period.</td></tr>'}</tbody>
+      </table>
+    </div>
+  </section>`;
+}
+
+async function renderEmployeeTimesheet() {
+  const employeeId = state.employeeTimesheetTarget?.id;
+  if (!employeeId) {
+    setPage("user-management");
+    return;
+  }
+
+  try {
+    await loadEmployeeHistory(employeeId, state.employeeTimesheetPeriod);
+  } catch (error) {
+    state.employeeTimesheetData = [];
+  }
+
+  const employee = state.employeeTimesheetTarget;
+  root.innerHTML = createPageShell(`${employee.fullName} Timesheet`, createEmployeeTimesheetTemplate());
+  attachDashboardListeners();
+
+  document.getElementById("back-to-employees")?.addEventListener("click", () => setPage("user-management"));
+  for (const tab of document.querySelectorAll("[data-employee-period]")) {
+    tab.addEventListener("click", async () => {
+      state.employeeTimesheetPeriod = normalizeDashboardPeriod(tab.dataset.employeePeriod);
+      await renderEmployeeTimesheet();
+    });
+  }
+}
+
 function updateUserManagementListeners() {
   const addUserButton = document.getElementById("add-user");
   if (addUserButton) {
@@ -1388,6 +1434,16 @@ function updateUserManagementListeners() {
     button.addEventListener("click", () => {
       const user = (state.employees || []).find((employee) => String(employee.id) === String(button.dataset.id));
       if (user) openUserModal(user);
+    });
+  }
+
+  for (const button of document.querySelectorAll("[data-action='view-timesheet']")) {
+    button.addEventListener("click", () => {
+      const employee = (state.employees || []).find((item) => String(item.id) === String(button.dataset.id));
+      if (!employee) return;
+      state.employeeTimesheetTarget = employee;
+      state.employeeTimesheetPeriod = "week";
+      setPage("employee-timesheet");
     });
   }
 

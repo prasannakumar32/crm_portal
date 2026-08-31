@@ -998,6 +998,18 @@ button {
   justify-content: space-between;
 }
 
+.card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-heading .icon-button {
+  flex: 0 0 40px;
+  width: 40px;
+  padding: 0;
+}
+
 .holidays-card h2 {
   font-size: 16px;
   margin-bottom: 14px;
@@ -2929,6 +2941,99 @@ button {
   box-shadow: 0 6px 16px rgba(239, 68, 68, 0.40);
 }
 
+.timesheet-time-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.time-input-wrapper {
+  width: 100%;
+}
+
+.time-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.time-input-group:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(44, 122, 122, 0.1);
+}
+
+.time-input-group .time-hour,
+.time-input-group .time-minute {
+  width: 50px;
+  padding: 8px 4px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+  border-radius: 4px;
+}
+
+.time-input-group .time-hour:focus,
+.time-input-group .time-minute:focus {
+  background: rgba(44, 122, 122, 0.05);
+}
+
+.time-input-group .time-separator {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  user-select: none;
+}
+
+.time-input-group .time-ampm {
+  width: 70px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.time-input-group .time-ampm:hover {
+  background: rgba(44, 122, 122, 0.05);
+  border-color: var(--primary);
+}
+
+.time-input-group .time-ampm:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(44, 122, 122, 0.1);
+}
+
+.time-input-group .time-ampm option {
+  padding: 8px 12px;
+  font-weight: 500;
+}
+
+.timezone-notice {
+  background: rgba(44, 122, 122, 0.1);
+  border-left: 4px solid var(--primary);
+  padding: 12px 16px;
+  margin: 12px 0;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -3532,6 +3637,15 @@ table.history td.day-cell {
   color: var(--text-primary);
 }
 
+table.history .history-actions {
+  min-width: 80px;
+  text-align: center;
+}
+
+table.history .history-actions .mini-action {
+  margin: 0 4px;
+}
+
 table.history tbody tr:hover {
   background: var(--bg);
 }
@@ -3780,6 +3894,89 @@ table.history tbody tr:hover {
   border: 1px solid var(--border);
   border-radius: 16px;
   box-shadow: var(--shadow);
+}
+
+.employee-timesheet-card {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.employee-timesheet-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.employee-timesheet-header h2 {
+  margin: 18px 0 4px;
+  font-size: 24px;
+}
+
+.employee-timesheet-header p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.employee-timesheet-tabs {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+
+.employee-timesheet-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.employee-timesheet-summary > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+}
+
+.employee-timesheet-summary span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.employee-timesheet-summary strong {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.employee-timesheet-table th:last-child,
+.employee-timesheet-table td:last-child {
+  text-align: right;
+}
+
+@media (max-width: 760px) {
+  .employee-timesheet-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .employee-timesheet-tabs {
+    width: 100%;
+  }
+
+  .employee-timesheet-tabs .tab {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .employee-timesheet-summary {
+    grid-template-columns: 1fr;
+  }
 }
 
 .users-card h2 {

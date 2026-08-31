@@ -10,21 +10,12 @@ services:
         value: 3333
       - key: NODE_ENV
         value: production
-      - key: MONGO_URI
-        fromDatabase:
-          name: crm-portal-mongodb
-          property: connectionString
-      - key: MONGODB_URI
-        fromDatabase:
-          name: crm-portal-mongodb
-          property: connectionString
-      - key: MONGO_DB_NAME
-        value: crm_portal
+      - key: SUPABASE_URL
+        value: https://qijolfnxazrimboqkwqa.supabase.co
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
       - key: SESSION_SECRET
         generateValue: true
 
 databases:
-  # MongoDB Database
-  - name: crm-portal-mongodb
-    databaseName: crm_portal
-    user: crm_user
+  # No database needed - using Supabase

@@ -10,5 +10,4 @@ function renderTimesheets() {
     });
   }
   updateDashboardValues();
-  renderHistory();
 }

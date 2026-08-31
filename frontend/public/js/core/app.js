@@ -17,7 +17,7 @@ const SCRIPT_REGISTRY = Object.freeze([
   "js/pages/work-schedules/workscheduleform.js",
 ]);
 
-const LOCAL_ASSET_VERSION = "20260826-2";
+const LOCAL_ASSET_VERSION = "20260827-3";
 
 const PAGE_DEFINITIONS = Object.freeze({
   dashboard: { render: () => renderDashboard() },
@@ -27,6 +27,7 @@ const PAGE_DEFINITIONS = Object.freeze({
   "work-schedules": { render: () => renderWorkSchedules() },
   tasks: { render: () => renderTasksPage() },
   "user-management": { render: () => renderEmployeeManagement() },
+  "employee-timesheet": { render: () => renderEmployeeTimesheet() },
 });
 
 function getPageDefinition(page) {
@@ -66,7 +67,7 @@ async function init() {
       loadToday().catch(() => {});
       loadHistory().catch(() => {});
     }
-    if (page === "timeoff" || page === "holidays" || page === "work-schedules" || page === "user-management") {
+    if (page === "timeoff" || page === "holidays" || page === "work-schedules" || page === "user-management" || page === "employee-timesheet") {
       loadToday().catch(() => {});
     }
   });
@@ -93,6 +94,8 @@ async function init() {
     } else if (state.page === "user-management") {
       await loadToday();
       await loadEmployees();
+    } else if (state.page === "employee-timesheet") {
+      await loadEmployeeHistory(state.employeeTimesheetTarget?.id, state.employeeTimesheetPeriod);
     } else if (state.page === "timesheets") {
       await loadToday();
       await loadHistory();

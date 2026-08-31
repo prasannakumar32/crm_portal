@@ -106,6 +106,35 @@ router.get("/history", async (req, res) => {
   res.json({ days: summaries, period });
 });
 
+router.get("/history/employee/:employeeId", async (req, res) => {
+  const admin = await db.findEmployeeById(req.session.employeeId || req.session.userId);
+  if (!admin || admin.role !== "admin") {
+    return res.status(403).json({ error: "Admin access required." });
+  }
+
+  const employee = await db.findEmployeeById(req.params.employeeId);
+  if (!employee) return res.status(404).json({ error: "Employee not found." });
+
+  const employeeTimeZone = employee.timezone || null;
+  const period = `${req.query.period || "day"}`.trim().toLowerCase();
+  const events = await db.getEventsForEmployee(employee.id);
+  const [startKey, endKey] = logic.getPeriodDateRange(period, employeeTimeZone);
+  const days = logic.buildDailySummariesBetween(events, startKey, endKey, employeeTimeZone);
+
+  return res.json({
+    employee: {
+      id: employee.id,
+      fullName: employee.fullName,
+      username: employee.username,
+      role: employee.role,
+      location: employee.location || null,
+      timezone: employee.timezone || null,
+    },
+    days,
+    period,
+  });
+});
+
 router.get("/leaves", async (req, res) => {
   try {
     const leaves = await db.getLeaves();

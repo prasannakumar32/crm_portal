@@ -1,5 +1,5 @@
 function createTimesheetEntryForm() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getDateKeyInTimeZone();
   return `<div class="task-modal-overlay timesheet-modal" id="timesheet-entry-card" hidden>
     <div class="task-modal-card timesheet-modal-card">
       <div class="task-modal-header"><h3 id="timesheet-entry-title">New timesheet</h3><button class="icon-button" type="button" id="close-timesheet" aria-label="Close timesheet dialog">&times;</button></div>
@@ -7,8 +7,32 @@ function createTimesheetEntryForm() {
         <p class="timesheet-form-intro">Enter your work hours and total break time for the day.</p>
         <label class="field-block"><span>Date</span><input id="timesheet-date" type="date" value="${today}" required /></label>
       <div class="timesheet-time-grid">
-        <label class="field-block"><span>Work Start Time</span><input name="check_in" type="time" required /></label>
-        <label class="field-block"><span>Work End Time</span><input name="check_out" type="time" required /></label>
+        <label class="field-block"><span>Work Start Time</span>
+          <div class="time-input-wrapper">
+            <div class="time-input-group">
+              <input name="check_in_hour" type="number" min="1" max="12" placeholder="12" required class="time-hour" />
+              <span class="time-separator">:</span>
+              <input name="check_in_minute" type="number" min="0" max="59" placeholder="00" required class="time-minute" />
+              <select name="check_in_ampm" class="time-ampm">
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
+          </div>
+        </label>
+        <label class="field-block"><span>Work End Time</span>
+          <div class="time-input-wrapper">
+            <div class="time-input-group">
+              <input name="check_out_hour" type="number" min="1" max="12" placeholder="12" required class="time-hour" />
+              <span class="time-separator">:</span>
+              <input name="check_out_minute" type="number" min="0" max="59" placeholder="00" required class="time-minute" />
+              <select name="check_out_ampm" class="time-ampm">
+                <option value="AM">AM</option>
+                <option value="PM" selected>PM</option>
+              </select>
+            </div>
+          </div>
+        </label>
         <label class="field-block"><span>Total Break Time (minutes)</span><input name="total_break_minutes" type="number" min="0" step="1" placeholder="0" /></label>
       </div>
         <label class="field-block"><span>Break reason</span><input id="timesheet-break-reason" maxlength="200" placeholder="Optional" /></label>
@@ -67,6 +91,21 @@ function openTimesheetEventEditor(event) {
   editForm.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
+function openTimesheetForDate(dateKey) {
+  const entryCard = document.getElementById("timesheet-entry-card");
+  const entryForm = document.getElementById("timesheet-entry-form");
+  if (!entryCard || !entryForm) return;
+  
+  entryForm.reset();
+  entryForm.dataset.mode = "new";
+  entryForm._editEvents = [];
+  document.getElementById("timesheet-entry-title").textContent = "New timesheet";
+  document.getElementById("timesheet-date").value = dateKey;
+  entryCard.hidden = false;
+  
+  entryForm.querySelector("input")?.focus();
+}
+
 function openTimesheetDayEditor(dateKey) {
   const entryCard = document.getElementById("timesheet-entry-card");
   const entryForm = document.getElementById("timesheet-entry-form");
@@ -81,14 +120,27 @@ function openTimesheetDayEditor(dateKey) {
   document.getElementById("timesheet-entry-title").textContent = "Edit timesheet";
   document.getElementById("timesheet-date").value = dateKey;
   
-  // Populate work start/end times
+  // Populate work start/end times with AM/PM format
   const checkInEvent = events.find(e => e.type === "check_in");
   const checkOutEvent = events.find(e => e.type === "check_out");
+  
   if (checkInEvent) {
-    entryForm.querySelector("[name=check_in]").value = timesheetInputParts(checkInEvent.timestampUtc).time;
+    const checkInTime = timesheetInputParts(checkInEvent.timestampUtc).time;
+    const [hour, minute] = checkInTime.split(':').map(Number);
+    const isPM = hour >= 12;
+    const hour12 = hour === 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+    entryForm.querySelector("[name=check_in_hour]").value = hour12;
+    entryForm.querySelector("[name=check_in_minute]").value = String(minute).padStart(2, '0');
+    entryForm.querySelector("[name=check_in_ampm]").value = isPM ? "PM" : "AM";
   }
   if (checkOutEvent) {
-    entryForm.querySelector("[name=check_out]").value = timesheetInputParts(checkOutEvent.timestampUtc).time;
+    const checkOutTime = timesheetInputParts(checkOutEvent.timestampUtc).time;
+    const [hour, minute] = checkOutTime.split(':').map(Number);
+    const isPM = hour >= 12;
+    const hour12 = hour === 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+    entryForm.querySelector("[name=check_out_hour]").value = hour12;
+    entryForm.querySelector("[name=check_out_minute]").value = String(minute).padStart(2, '0');
+    entryForm.querySelector("[name=check_out_ampm]").value = isPM ? "PM" : "AM";
   }
   
   // Calculate and populate total break minutes
@@ -105,8 +157,6 @@ function openTimesheetDayEditor(dateKey) {
   }
   
   entryCard.hidden = false;
-  const newButton = document.getElementById("new-timesheet");
-  if (newButton) newButton.hidden = true;
 }
 
 function attachTimesheetFormListeners() {
@@ -115,60 +165,77 @@ function attachTimesheetFormListeners() {
   const errorBox = document.getElementById("timesheet-form-error");
   if (!entryCard || !entryForm) return;
 
-  const newButton = document.getElementById("new-timesheet");
-  if (newButton) newButton.addEventListener("click", () => {
-    entryForm.dataset.mode = "new";
-    entryForm._editEvents = [];
-    document.getElementById("timesheet-entry-title").textContent = "New timesheet";
-    entryForm.reset();
-    document.getElementById("timesheet-date").value = new Date().toISOString().slice(0, 10);
-    entryCard.hidden = false;
-    newButton.hidden = true;
-    entryForm.querySelector("input")?.focus();
-  });
-
   const cancelButton = document.getElementById("cancel-timesheet");
   if (cancelButton) cancelButton.addEventListener("click", () => {
     entryForm.reset();
-    document.getElementById("timesheet-date").value = new Date().toISOString().slice(0, 10);
+    document.getElementById("timesheet-date").value = getDateKeyInTimeZone();
     entryCard.hidden = true;
     entryForm.dataset.mode = "new";
     entryForm._editEvents = [];
-    if (newButton) newButton.hidden = false;
   });
   const closeButton = document.getElementById("close-timesheet");
-  if (closeButton) closeButton.addEventListener("click", () => { entryCard.hidden = true; if (newButton) newButton.hidden = false; });
+  if (closeButton) closeButton.addEventListener("click", () => { entryCard.hidden = true; });
   entryCard.addEventListener("click", (event) => {
     if (event.target === entryCard) {
       entryCard.hidden = true;
-      if (newButton) newButton.hidden = false;
     }
   });
 
   entryForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (errorBox) errorBox.textContent = "";
+    const showFormError = (message) => {
+      if (!errorBox) return;
+      errorBox.textContent = message;
+      errorBox.classList.add("visible");
+    };
+    if (errorBox) {
+      errorBox.textContent = "";
+      errorBox.classList.remove("visible");
+    }
     const formData = new FormData(entryForm);
     const date = document.getElementById("timesheet-date").value;
-    const checkInTime = formData.get("check_in");
-    const checkOutTime = formData.get("check_out");
-    const totalBreakMinutes = parseInt(formData.get("total_break_minutes") || "0");
     
-    if (!checkInTime || !checkOutTime) {
-      if (errorBox) errorBox.textContent = "Work start and end times are required.";
+    // Get AM/PM time values
+    const checkInHour = parseInt(formData.get("check_in_hour"));
+    const checkInMinute = parseInt(formData.get("check_in_minute"));
+    const checkInAmPm = formData.get("check_in_ampm");
+    const checkOutHour = parseInt(formData.get("check_out_hour"));
+    const checkOutMinute = parseInt(formData.get("check_out_minute"));
+    const checkOutAmPm = formData.get("check_out_ampm");
+    const totalBreakMinutes = parseInt(formData.get("total_break_minutes")) || 0;
+    
+    // Validate time inputs
+    if (!date || [checkInHour, checkInMinute, checkOutHour, checkOutMinute].some(Number.isNaN)) {
+      showFormError("Work date, start time, and end time are required.");
       return;
     }
+    if (checkInHour < 1 || checkInHour > 12 || checkOutHour < 1 || checkOutHour > 12) {
+      showFormError("Hour must be between 1 and 12.");
+      return;
+    }
+    if (checkInMinute < 0 || checkInMinute > 59 || checkOutMinute < 0 || checkOutMinute > 59) {
+      showFormError("Minute must be between 0 and 59.");
+      return;
+    }
+    
+    // Convert AM/PM to 24-hour format
+    const checkIn24Hour = checkInAmPm === "PM" && checkInHour !== 12 ? checkInHour + 12 : (checkInAmPm === "AM" && checkInHour === 12 ? 0 : checkInHour);
+    const checkOut24Hour = checkOutAmPm === "PM" && checkOutHour !== 12 ? checkOutHour + 12 : (checkOutAmPm === "AM" && checkOutHour === 12 ? 0 : checkOutHour);
+    
+    let checkInTime = `${String(checkIn24Hour).padStart(2, '0')}:${String(checkInMinute).padStart(2, '0')}`;
+    let checkOutTime = `${String(checkOut24Hour).padStart(2, '0')}:${String(checkOutMinute).padStart(2, '0')}`;
+    
     if (checkInTime >= checkOutTime) {
-      if (errorBox) errorBox.textContent = "Work end time must be after work start time.";
+      showFormError("Work end time must be after work start time.");
       return;
     }
     
     // Validate break time doesn't exceed work duration
-    const checkInDate = new Date(`${date}T${checkInTime}`);
-    const checkOutDate = new Date(`${date}T${checkOutTime}`);
+    const checkInDate = new Date(userTimeToUtcIso(date, checkInTime));
+    const checkOutDate = new Date(userTimeToUtcIso(date, checkOutTime));
     const workDurationMinutes = (checkOutDate - checkInDate) / (60 * 1000);
     if (totalBreakMinutes >= workDurationMinutes) {
-      if (errorBox) errorBox.textContent = "Break time cannot exceed work duration.";
+      showFormError("Break time cannot exceed work duration.");
       return;
     }
 
@@ -185,7 +252,7 @@ function attachTimesheetFormListeners() {
       
       // Create new events in chronological order
       const checkInPayload = {
-        timestampUtc: new Date(`${date}T${checkInTime}`).toISOString(),
+        timestampUtc: checkInDate.toISOString(),
       };
       await apiJson(`/api/attendance/check-in`, {
         method: "POST",
@@ -194,8 +261,8 @@ function attachTimesheetFormListeners() {
       
       // If break time is specified, create break events in the middle of work period
       if (totalBreakMinutes > 0) {
-        const checkInTimeMs = new Date(`${date}T${checkInTime}`).getTime();
-        const checkOutTimeMs = new Date(`${date}T${checkOutTime}`).getTime();
+        const checkInTimeMs = checkInDate.getTime();
+        const checkOutTimeMs = checkOutDate.getTime();
         const workDurationMs = checkOutTimeMs - checkInTimeMs;
         
         // Start break at midpoint of work period
@@ -222,7 +289,7 @@ function attachTimesheetFormListeners() {
       
       // Create check-out event last
       const checkOutPayload = {
-        timestampUtc: new Date(`${date}T${checkOutTime}`).toISOString(),
+        timestampUtc: checkOutDate.toISOString(),
       };
       await apiJson(`/api/attendance/check-out`, {
         method: "POST",
@@ -234,7 +301,7 @@ function attachTimesheetFormListeners() {
       renderTimesheets();
     } catch (error) {
       console.error("[Timesheet] Save failed", error);
-      if (errorBox) errorBox.textContent = error.error || "Unable to save the timesheet.";
+      showFormError(error.error || error.message || "Unable to save the timesheet.");
       if (submitButton) submitButton.disabled = false;
     }
   });
@@ -262,15 +329,31 @@ function attachTimesheetFormListeners() {
       openTimesheetDayEditor(editDayButton.dataset.editTimesheetDay);
       return;
     }
-    const button = event.target.closest("[data-edit-timesheet-event]");
-    if (!button) return;
-    const selected = (state.todayEvents || []).find((item) => item.id === button.dataset.editTimesheetEvent) || {
-      id: button.dataset.editTimesheetEvent,
-      type: button.dataset.eventType,
-      timestampUtc: button.dataset.eventTimestamp,
-      reason: "",
-    };
-    openTimesheetEventEditor(selected);
+    const addDayButton = event.target.closest("[data-add-timesheet-day]");
+    if (addDayButton) {
+      openTimesheetForDate(addDayButton.dataset.addTimesheetDay);
+      return;
+    }
+  });
+  
+  // Add event listeners for matrix table edit/delete/add buttons
+  const matrixTable = document.querySelector(".weekly-matrix-table");
+  if (matrixTable) matrixTable.addEventListener("click", (event) => {
+    const deleteDayButton = event.target.closest("[data-delete-timesheet-day]");
+    if (deleteDayButton) {
+      deleteTimesheetDay(deleteDayButton.dataset.deleteTimesheetDay);
+      return;
+    }
+    const editDayButton = event.target.closest("[data-edit-timesheet-day]");
+    if (editDayButton) {
+      openTimesheetDayEditor(editDayButton.dataset.editTimesheetDay);
+      return;
+    }
+    const addDayButton = event.target.closest("[data-add-timesheet-day]");
+    if (addDayButton) {
+      openTimesheetForDate(addDayButton.dataset.addTimesheetDay);
+      return;
+    }
   });
 
   const cancelEdit = document.getElementById("cancel-timesheet-edit");
@@ -283,7 +366,6 @@ function attachTimesheetFormListeners() {
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
     entryCard.hidden = true;
-    if (newButton) newButton.hidden = false;
     if (editCard) editCard.hidden = true;
   });
   if (editForm) editForm.addEventListener("submit", async (event) => {
@@ -295,7 +377,7 @@ function attachTimesheetFormListeners() {
       await apiJson(`/api/attendance/events/${document.getElementById("edit-timesheet-event-id").value}`, {
         method: "PUT",
         body: JSON.stringify({
-          timestampUtc: new Date(`${document.getElementById("edit-timesheet-date").value}T${document.getElementById("edit-timesheet-time").value}`).toISOString(),
+          timestampUtc: userTimeToUtcIso(document.getElementById("edit-timesheet-date").value, document.getElementById("edit-timesheet-time").value),
           reason: document.getElementById("edit-timesheet-reason").value.trim(),
         }),
       });
@@ -311,16 +393,13 @@ function attachTimesheetFormListeners() {
 
 function createWeeklyMatrixView() {
   const zone = getUserTimeZone();
-  const today = new Date();
-  const currentDay = today.getDay();
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1));
+  const todayKey = getDateKeyInTimeZone();
+  const currentDay = new Date(`${todayKey}T12:00:00Z`).getUTCDay();
+  const mondayKey = addDaysToDateKey(todayKey, -(currentDay === 0 ? 6 : currentDay - 1));
   
   const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const weekData = weekDays.map((day, index) => {
-    const date = new Date(monday);
-    date.setDate(monday.getDate() + index);
-    const dateKey = date.toISOString().slice(0, 10);
+    const dateKey = addDaysToDateKey(mondayKey, index);
     const dayData = (state.historyData || []).find(d => d.date === dateKey);
     const hasData = dayData && dayData.events && dayData.events.length > 0;
     
@@ -352,7 +431,11 @@ function createWeeklyMatrixView() {
           <button type="button" class="mini-action danger icon-action" title="Delete" data-delete-timesheet-day="${day.eventIds}">
             <span class="material-symbols-outlined">delete</span>
           </button>
-        ` : '<span class="no-data">—</span>'}
+        ` : `
+          <button type="button" class="mini-action icon-action" title="Add timesheet" data-add-timesheet-day="${day.date}">
+            <span class="material-symbols-outlined">add</span>
+          </button>
+        `}
       </td>
     </tr>
   `).join('');
@@ -381,6 +464,69 @@ function createWeeklyMatrixView() {
 function createTimesheetsTemplate() {
   const zone = getUserTimeZone();
   const selectedPeriod = normalizeDashboardPeriod(state.dashboardPeriod);
+  
+  // Generate date range for the current period
+  let dateRange = [];
+  const todayKey = getDateKeyInTimeZone();
+  
+  if (selectedPeriod === "day") {
+    dateRange = [todayKey];
+  } else if (selectedPeriod === "month") {
+    const [year, monthText] = todayKey.split("-");
+    const month = Number(monthText) - 1;
+    const daysInMonth = new Date(Date.UTC(Number(year), month + 1, 0)).getUTCDate();
+    for (let i = 1; i <= daysInMonth; i++) {
+      dateRange.push(`${year}-${String(month + 1).padStart(2, "0")}-${String(i).padStart(2, "0")}`);
+    }
+  }
+  
+  const sortedRows = [...state.historyData].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const historyRows = dateRange.map(date => {
+    const dayData = sortedRows.find(d => d.date === date);
+    if (dayData) {
+      return `
+      <tr>
+        <td>${dayData.date}</td>
+        <td>${dayData.checkInUtc ? formatTime(dayData.checkInUtc, zone) : "—"}</td>
+        <td>${dayData.checkOutUtc ? formatTime(dayData.checkOutUtc, zone) : "—"}</td>
+        <td>${formatDuration(dayData.breakSeconds)}</td>
+        <td>${formatDuration(dayData.workedSeconds)}</td>
+        <td class="history-actions">
+          <button type="button" class="mini-action icon-action" title="Add timesheet" data-add-timesheet-day="${dayData.date}">
+            <span class="material-symbols-outlined">add</span>
+          </button>
+          <button type="button" class="mini-action icon-action" title="Edit" data-edit-timesheet-day="${dayData.date}">
+            <span class="material-symbols-outlined">edit</span>
+          </button>
+          <button type="button" class="mini-action danger icon-action" title="Delete" data-delete-timesheet-day="${dayData.events?.map(e => e.id).join(',') || ''}">
+            <span class="material-symbols-outlined">delete</span>
+          </button>
+        </td>
+      </tr>
+    `;
+    } else {
+      return `
+      <tr>
+        <td>${date}</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td class="history-actions">
+          <button type="button" class="mini-action icon-action" title="Add timesheet" data-add-timesheet-day="${date}">
+            <span class="material-symbols-outlined">add</span>
+          </button>
+          <button type="button" class="mini-action icon-action" title="Edit unavailable" aria-label="Edit unavailable" disabled>
+            <span class="material-symbols-outlined">edit</span>
+          </button>
+          <button type="button" class="mini-action danger icon-action" title="Delete unavailable" aria-label="Delete unavailable" disabled>
+            <span class="material-symbols-outlined">delete</span>
+          </button>
+        </td>
+      </tr>
+    `;
+    }
+  }).join("");
   const periodDesc = selectedPeriod === "week" ? "this week" : selectedPeriod === "month" ? "this month" : "today";
   const dayDurations = computeDurationsClient(state.todayEvents);
   const summaryWorked = formatDuration(dayDurations.workedSeconds);
@@ -393,7 +539,6 @@ function createTimesheetsTemplate() {
         <button class="tab ${state.dashboardPeriod === "week" ? "active" : ""}" type="button" data-period="week" aria-pressed="${state.dashboardPeriod === "week"}">Week</button>
         <button class="tab ${state.dashboardPeriod === "month" ? "active" : ""}" type="button" data-period="month" aria-pressed="${state.dashboardPeriod === "month"}">Month</button>
       </div>
-      <section class="card timesheet-toolbar"><div><h2>Timesheets</h2><p>Review your recorded work hours or add a manual entry.</p></div><button class="btn btn-primary" type="button" id="new-timesheet">New Timesheet</button></section>
       ${createTimesheetEntryForm()}
       ${createTimesheetEditForm()}
       <section class="card tracked-card">
@@ -407,6 +552,16 @@ function createTimesheetsTemplate() {
           </div>
         </section>
         ${state.dashboardPeriod === "week" ? createWeeklyMatrixView() : ''}
+        ${state.dashboardPeriod !== "week" ? `
+        <div class="card history-card">
+          <div class="card-heading"><h2>Daily timesheet history</h2></div>
+          <table class="history">
+            <thead><tr><th>Date</th><th>Check in (${zone})</th><th>Check out (${zone})</th><th>Break</th><th>Worked</th><th>Actions</th></tr></thead>
+            <tbody id="history-body">${historyRows}</tbody>
+          </table>
+          <p class="empty-note" id="history-empty" style="display:${historyRows ? "none" : "block"};">No history yet.</p>
+        </div>
+        ` : ''}
       `;
 }
 
@@ -423,4 +578,43 @@ async function deleteTimesheetDay(eventIds) {
   } catch (error) {
     alert(error.error || "Unable to delete the daily timesheet.");
   }
+}
+
+function getDateKeyInTimeZone(date = new Date(), timeZone = getUserTimeZone()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date).reduce((values, part) => ({ ...values, [part.type]: part.value }), {});
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function addDaysToDateKey(dateKey, days) {
+  const date = new Date(`${dateKey}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function userTimeToUtcIso(date, time, timeZone = getUserTimeZone()) {
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  const utcGuess = Date.UTC(year, month - 1, day, hour, minute);
+  const localParts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(utcGuess)).reduce((values, part) => ({ ...values, [part.type]: part.value }), {});
+  const representedUtc = Date.UTC(
+    Number(localParts.year),
+    Number(localParts.month) - 1,
+    Number(localParts.day),
+    Number(localParts.hour),
+    Number(localParts.minute)
+  );
+  return new Date(utcGuess - (representedUtc - utcGuess)).toISOString();
 }
