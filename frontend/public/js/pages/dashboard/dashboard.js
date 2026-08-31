@@ -691,40 +691,6 @@ function attachDashboardListeners() {
     });
   }
 
-  const leaveForm = document.getElementById("leave-form");
-  if (leaveForm) {
-    leaveForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const leaveId = document.getElementById("leave-id").value;
-      const payload = {
-        name: document.getElementById("leave-name").value,
-        type: document.getElementById("leave-type").value,
-        location: document.getElementById("leave-location").value,
-        startDate: document.getElementById("leave-date").value,
-        endDate: document.getElementById("leave-end-date").value,
-        reason: document.getElementById("leave-reason").value,
-        status: document.getElementById("leave-status").value,
-      };
-      
-      try {
-        if (leaveId) {
-          await updateLeave(leaveId, payload);
-        } else {
-          await createLeave(payload);
-        }
-        await loadLeaves();
-        state.holidayEditTarget = null;
-        closeLeaveModal();
-        if (state.page === "timeoff") renderTimeOff();
-        else if (state.page === "holidays") renderHolidays();
-        else renderDashboard();
-      } catch (error) {
-        console.error("Failed to save leave:", error);
-        alert("Failed to save leave. Please try again.");
-      }
-    });
-  }
-
   const scheduleClose = document.getElementById("close-schedule-modal");
   if (scheduleClose) scheduleClose.addEventListener("click", closeScheduleModal);
   const scheduleCancel = document.getElementById("cancel-schedule");
@@ -1179,8 +1145,11 @@ function attachLeaveModalListeners() {
 
   const leaveForm = document.getElementById("leave-form");
   if (leaveForm) {
+    if (leaveForm.dataset.leaveListenerBound === "true") return;
+    leaveForm.dataset.leaveListenerBound = "true";
     leaveForm.addEventListener("submit", async (event) => {
       event.preventDefault();
+      if (leaveForm.dataset.saving === "true") return;
       const leaveId = document.getElementById("leave-id").value;
       const payload = {
         name: document.getElementById("leave-name").value,
@@ -1192,6 +1161,7 @@ function attachLeaveModalListeners() {
         status: document.getElementById("leave-status").value || "Requested",
       };
       if (!payload.name || !payload.startDate || !payload.endDate || !payload.reason) return;
+      leaveForm.dataset.saving = "true";
       try {
         if (leaveId) {
           await updateLeave(leaveId, payload);
@@ -1210,6 +1180,8 @@ function attachLeaveModalListeners() {
       } catch (error) {
         console.error("Failed to save leave:", error);
         alert("Failed to save leave. Please try again.");
+      } finally {
+        leaveForm.dataset.saving = "false";
       }
     });
   }
