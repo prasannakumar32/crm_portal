@@ -85,6 +85,8 @@ CREATE TABLE IF NOT EXISTS leaves (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   employee_id TEXT NOT NULL,
   employee_name TEXT NOT NULL,
+  name TEXT,
+  location TEXT,
   start_date DATE NOT NULL,
   end_date DATE,
   type TEXT DEFAULT 'Leave',

@@ -67,7 +67,10 @@ async function init() {
       loadToday().catch(() => {});
       loadHistory().catch(() => {});
     }
-    if (page === "timeoff" || page === "holidays" || page === "work-schedules" || page === "user-management" || page === "employee-timesheet") {
+    if (page === "timeoff") {
+      loadToday().catch(() => {});
+      loadLeaves().catch(() => {});
+    } else if (page === "holidays" || page === "work-schedules" || page === "user-management" || page === "employee-timesheet") {
       loadToday().catch(() => {});
     }
   });
@@ -99,7 +102,10 @@ async function init() {
     } else if (state.page === "timesheets") {
       await loadToday();
       await loadHistory();
-    } else if (state.page === "timeoff" || state.page === "work-schedules") {
+    } else if (state.page === "timeoff") {
+      await loadToday();
+      await loadLeaves();
+    } else if (state.page === "work-schedules") {
       await loadToday();
     }
   }

@@ -9,7 +9,7 @@ A professional CRM/team portal with:
 - **Today's timeline + history** — worked time and break time are computed automatically (worked = time between check-in and check-out, minus breaks).
 - **Daily hours chart** — Professional bar chart showing worked hours and break hours for each day in chronological order.
 - **Password visibility toggle** — Professional password show/hide functionality with proper icons.
-- **MongoDB database** — Production-ready MongoDB integration for scalable data storage.
+- **Supabase database** — Production-ready Supabase (PostgreSQL) integration for scalable data storage.
 
 ## Run it (Local Development)
 
@@ -26,21 +26,15 @@ The server listens on port 3333 by default; set `PORT=xxxx` to change it.
 
 ## Database Setup
 
-### MongoDB Atlas (Recommended for Production)
+### Supabase (Recommended for Production)
 
-1. Create a MongoDB Atlas account: https://www.mongodb.com/cloud/atlas
-2. Create a cluster
-3. Create a Database User:
-   - Go to: Database → Database Users → Add New Database User
-   - Use username: crm_user (or your preferred username)
-   - Generate a secure password
-   - Set Database User Privileges: Built-in role: Atlas admin
-4. Copy your connection string from: Clusters > Connect > Drivers
-5. Replace `<USERNAME>` and `<PASSWORD>` in `.env` file
-6. Ensure your IP is whitelisted:
-   - Go to: Network Access → IP Access List
-   - Add your IP address or allow 0.0.0.0/0 for development
-7. Copy `.env.example` to `.env` and update with your credentials
+1. Create a Supabase account: https://supabase.com
+2. Create a new project
+3. Go to Project Settings → API
+4. Copy the Project URL and Service Role Key
+5. Copy `.env.example` to `.env` and update with your credentials
+6. Run the SQL schema in `supabase-schema.sql` in Supabase SQL Editor to create tables
+7. Run `npm run seed` to populate initial users
 ## Deploy to Render.com
 
 1. **Push to GitHub**:
@@ -59,12 +53,13 @@ The server listens on port 3333 by default; set `PORT=xxxx` to change it.
    - Connect your GitHub repository
    - Render will automatically detect `render.yaml` configuration
    - The configuration includes:
-     - MongoDB database setup
+     - Supabase connection setup
      - Environment variables (auto-generated SESSION_SECRET)
      - Node.js web service configuration
 
-3. **Environment Variables** (Render handles automatically):
-   - `MONGODB_URI` - Auto-configured from Render MongoDB service
+3. **Environment Variables**:
+   - `SUPABASE_URL` - Set in render.yaml
+   - `SUPABASE_SERVICE_ROLE_KEY` - Add manually in Render dashboard (get from Supabase Project Settings → API)
    - `SESSION_SECRET` - Auto-generated secure string
    - `PORT` - Set by Render automatically
    - `NODE_ENV` - Set to production
@@ -78,16 +73,15 @@ crm-portal/
 ├── backend/
 │   ├── server.js           Express app, sessions, route wiring
 │   ├── src/
-│   │   ├── db.js             MongoDB data access (users + attendance events)
-│   │   ├── mongo.js          MongoDB connection management
+│   │   ├── db.js             Supabase data access (users + attendance events)
+│   │   ├── supabase.js       Supabase client configuration
 │   │   ├── attendanceLogic.js  Check-in/break/check-out state machine + duration math
 │   │   ├── auth.js            /api/auth/* routes (register, login, logout, me)
 │   │   ├── attendance.js      /api/attendance/* routes (check-in, break-*, check-out, today, history)
 │   │   ├── tasks.js           /api/tasks/* routes for task management
+│   │   ├── holidays.js        /api/holidays/* routes for holiday management
+│   │   ├── seed-supabase.js   Database seeding script
 │   │   └── middleware.js      requireAuth guards for API + pages
-│   └── data/
-│       ├── users.json        (Local development - can be ignored with MongoDB)
-│       └── attendance.json   (Local development - can be ignored with MongoDB)
 ├── frontend/
 │   ├── app-shell.js         Server-rendered browser entry shell
 │   ├── public/
@@ -102,6 +96,7 @@ crm-portal/
 │   │       └── t_m_logo.png
 │   └── server.js             Frontend development server
 ├── render.yaml               Render.com deployment configuration
+├── supabase-schema.sql       Supabase database schema
 ├── .env.example              Environment variables template
 ├── package.json
 └── README.md
@@ -118,7 +113,7 @@ crm-portal/
 - ✅ Location capture with reverse geocoding
 - ✅ IST + GMT timezone support
 - ✅ Session-based authentication
-- ✅ MongoDB database integration
+- ✅ Supabase database integration
 
 ### Additional Features
 - ✅ Timesheets and history tracking

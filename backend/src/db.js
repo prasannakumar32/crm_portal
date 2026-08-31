@@ -37,7 +37,13 @@ function normalizeProject(project) {
 
 function normalizeLeave(leave) {
   if (!leave) return null;
-  return toCamelCase(leave);
+  const normalized = toCamelCase(leave);
+  return {
+    ...normalized,
+    name: normalized.name || normalized.employeeName || "Leave request",
+    location: normalized.location || "India",
+    status: normalized.status || "Pending",
+  };
 }
 
 async function getEmployees() {
@@ -496,7 +502,9 @@ async function getLeaveById(id) {
 async function createLeave(leaveData) {
   const doc = {
     employee_id: leaveData.employeeId,
-    employee_name: leaveData.employeeName,
+    employee_name: leaveData.employeeName || leaveData.name || 'Employee',
+    name: leaveData.name || leaveData.employeeName || 'Leave request',
+    location: leaveData.location || 'India',
     start_date: leaveData.startDate,
     end_date: leaveData.endDate || null,
     type: leaveData.type || 'Leave',
@@ -521,7 +529,9 @@ async function createLeave(leaveData) {
 async function updateLeave(id, updateData) {
   const updates = {
     employee_id: updateData.employeeId,
-    employee_name: updateData.employeeName,
+    employee_name: updateData.employeeName || updateData.name || 'Employee',
+    name: updateData.name || updateData.employeeName || 'Leave request',
+    location: updateData.location || 'India',
     start_date: updateData.startDate,
     end_date: updateData.endDate || null,
     type: updateData.type || 'Leave',

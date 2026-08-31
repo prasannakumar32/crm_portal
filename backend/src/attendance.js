@@ -155,7 +155,9 @@ router.post("/leaves", async (req, res) => {
     }
     if (String(leaveType).toLowerCase() === "holiday" && !(await requireAdminForHoliday(req, res))) return;
     const leave = await db.createLeave({
-      name,
+      employeeId: employee.id,
+      employeeName: employee.fullName || employee.username || "Employee",
+      name: name || (employee.fullName ? `${employee.fullName}'s leave` : "Leave request"),
       type: leaveType,
       location: location || employee.location || "India",
       startDate,
@@ -181,9 +183,11 @@ router.put("/leaves/:id", async (req, res) => {
     const isHoliday = String(existingLeave.type || "").toLowerCase() === "holiday" || String(type || "").toLowerCase() === "holiday";
     if (isHoliday && !(await requireAdminForHoliday(req, res))) return;
     const leave = await db.updateLeave(id, {
-      name,
+      employeeId: existingLeave.employeeId || existingLeave.employee_id || req.session.employeeId || req.session.userId,
+      employeeName: existingLeave.employeeName || existingLeave.employee_name || (employee && employee.fullName) || "Employee",
+      name: name || existingLeave.name || existingLeave.employeeName || "Leave request",
       type,
-      location,
+      location: location || existingLeave.location || (employee && employee.location) || "India",
       startDate,
       endDate,
       reason,
