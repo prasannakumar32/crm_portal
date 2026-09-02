@@ -11,8 +11,8 @@ function createTimeOffTemplate() {
     const adminActions = isAdmin ? `
       <div class="row-admin-actions">
         ${item.status === "Pending" || item.status === "Requested" ? `
-          <button type="button" class="mini-action" data-action="approve-leave" data-id="${item.id}">Approve</button>
-          <button type="button" class="mini-action danger" data-action="reject-leave" data-id="${item.id}">Reject</button>
+          <button type="button" class="mini-action" data-action="accept-leave" data-id="${item.id}">Accept</button>
+          <button type="button" class="mini-action danger" data-action="decline-leave" data-id="${item.id}">Decline</button>
         ` : ""}
       </div>
     ` : `

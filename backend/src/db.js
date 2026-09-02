@@ -116,7 +116,31 @@ async function findEmployeeById(id) {
   return null;
 }
 
-async function createEmployee({ username, passwordHash, fullName, role = "employee", location = null, timezone = null, dailyBreakAllowanceMinutes = 60 }) {
+async function findEmployeeByEmail(email) {
+  if (!email) return null;
+  
+  // Check employees table first
+  const { data: employee, error: empError } = await supabase
+    .from('employees')
+    .select('*')
+    .eq('microsoft_email', email)
+    .single();
+  
+  if (employee && !empError) return normalizeEmployee(employee);
+  
+  // Check users table
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('microsoft_email', email)
+    .single();
+  
+  if (user && !userError) return normalizeEmployee(user);
+  
+  return null;
+}
+
+async function createEmployee({ username, passwordHash, fullName, role = "employee", location = null, timezone = null, dailyBreakAllowanceMinutes = 60, microsoftUserId = null, microsoftEmail = null }) {
   const normalizedUsername = username.trim().toLowerCase();
   const doc = {
     username: username.trim(),
@@ -127,6 +151,8 @@ async function createEmployee({ username, passwordHash, fullName, role = "employ
     location: location || null,
     timezone: timezone || null,
     daily_break_allowance_minutes: dailyBreakAllowanceMinutes || 60,
+    microsoft_user_id: microsoftUserId || null,
+    microsoft_email: microsoftEmail || null,
   };
   
   const { data, error } = await supabase
@@ -143,7 +169,7 @@ async function createEmployee({ username, passwordHash, fullName, role = "employ
   return normalizeEmployee(data);
 }
 
-async function updateEmployee(id, { username, passwordHash, fullName, role, location, timezone }) {
+async function updateEmployee(id, { username, passwordHash, fullName, role, location, timezone, microsoftUserId, microsoftEmail }) {
   const updates = {
     username: username.trim(),
     normalized_username: username.trim().toLowerCase(),
@@ -153,6 +179,8 @@ async function updateEmployee(id, { username, passwordHash, fullName, role, loca
     timezone: timezone || null,
   };
   if (passwordHash) updates.password_hash = passwordHash;
+  if (microsoftUserId) updates.microsoft_user_id = microsoftUserId;
+  if (microsoftEmail) updates.microsoft_email = microsoftEmail;
   
   const { data, error } = await supabase
     .from('employees')
@@ -591,6 +619,7 @@ module.exports = {
   getEmployees,
   findEmployeeByUsername,
   findEmployeeById,
+  findEmployeeByEmail,
   createEmployee,
   updateEmployee,
   deleteEmployee,

@@ -493,6 +493,15 @@ function renderLogin() {
   root.innerHTML = renderLoginForm();
 
   setError(state.error);
+  
+  // Microsoft login button handler
+  const microsoftBtn = document.getElementById("microsoft-login-btn");
+  if (microsoftBtn) {
+    microsoftBtn.addEventListener("click", () => {
+      window.location.href = "/api/auth/microsoft/login";
+    });
+  }
+  
   const form = document.getElementById("login-form");
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -647,36 +656,36 @@ function attachDashboardListeners() {
     btn.addEventListener("click", () => openLeaveModal(btn.dataset.id));
   }
 
-  const approveButtons = document.querySelectorAll("[data-action='approve-leave']");
-  for (const btn of approveButtons) {
+  const acceptButtons = document.querySelectorAll("[data-action='accept-leave'], [data-action='approve-leave']");
+  for (const btn of acceptButtons) {
     btn.addEventListener("click", async () => {
       const target = btn.dataset.id;
       try {
         await updateLeave(target, { status: "Approved" });
         await loadLeaves();
-        showSuccess("Leave request approved.");
+        showSuccess("Leave request accepted.");
         if (state.page === "timeoff") renderTimeOff();
         else renderDashboard();
       } catch (error) {
-        console.error("Failed to approve leave:", error);
-        showErrorNotification("Failed to approve leave. Please try again.");
+        console.error("Failed to accept leave:", error);
+        showErrorNotification("Failed to accept leave. Please try again.");
       }
     });
   }
 
-  const rejectButtons = document.querySelectorAll("[data-action='reject-leave']");
-  for (const btn of rejectButtons) {
+  const declineButtons = document.querySelectorAll("[data-action='decline-leave'], [data-action='reject-leave']");
+  for (const btn of declineButtons) {
     btn.addEventListener("click", async () => {
       const target = btn.dataset.id;
       try {
         await updateLeave(target, { status: "Rejected" });
         await loadLeaves();
-        showSuccess("Leave request rejected.");
+        showSuccess("Leave request declined.");
         if (state.page === "timeoff") renderTimeOff();
         else renderDashboard();
       } catch (error) {
-        console.error("Failed to reject leave:", error);
-        showErrorNotification("Failed to reject leave. Please try again.");
+        console.error("Failed to decline leave:", error);
+        showErrorNotification("Failed to decline leave. Please try again.");
       }
     });
   }

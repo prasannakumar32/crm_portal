@@ -1,7 +1,9 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const db = require("./db");
 const { requireAuth } = require("./middleware");
+const { supabase } = require("./supabase");
 
 const router = express.Router();
 
@@ -225,6 +227,108 @@ router.put("/employees/:id/break-allowance", canManageEmployees, async (req, res
     });
   } catch (err) {
     res.status(500).json({ error: err.message || 'Internal error' });
+  }
+});
+
+// Microsoft OAuth Login
+router.get("/microsoft/login", async (req, res) => {
+  try {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'microsoft',
+      options: {
+        redirectTo: `${req.protocol}://${req.get('host')}/api/auth/microsoft/callback`,
+        scopes: 'openid profile email'
+      }
+    });
+
+    if (error) throw error;
+
+    if (data.url) {
+      res.redirect(data.url);
+    } else {
+      res.status(500).json({ error: "Failed to initiate Microsoft login" });
+    }
+  } catch (err) {
+    console.error("Microsoft OAuth error:", err);
+    res.status(500).json({ error: "Failed to initiate Microsoft login" });
+  }
+});
+
+// Microsoft OAuth Callback
+router.get("/microsoft/callback", async (req, res) => {
+  try {
+    const { code } = req.query;
+    
+    if (!code) {
+      return res.redirect('/#login?error=microsoft_auth_failed');
+    }
+
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (error || !data.user) {
+      console.error("Microsoft callback error:", error);
+      return res.redirect('/#login?error=microsoft_auth_failed');
+    }
+
+    const { user, session } = data;
+    const email = user.email;
+    const fullName = user.user_metadata?.full_name || user.user_metadata?.name || email.split('@')[0];
+
+    // Try to find existing employee by email
+    let employee = await db.findEmployeeByEmail(email);
+
+    if (employee) {
+      // Link Microsoft account to existing employee
+      await db.updateEmployee(employee.id, { 
+        microsoftUserId: user.id,
+        microsoftEmail: email 
+      });
+      
+      req.session.employeeId = employee.id;
+      req.session.userId = employee.id;
+      req.session.loginAt = new Date().toISOString();
+      req.session.microsoftUserId = user.id;
+      
+      return res.redirect('/#dashboard');
+    } else {
+      // Create new employee account
+      const employees = await db.getEmployees();
+      const role = employees.length === 0 ? "admin" : "employee";
+      
+      const username = email.split('@')[0].replace(/[^a-zA-Z0-9_.]/g, '');
+      
+      // Check if username exists, append number if needed
+      let finalUsername = username;
+      let counter = 1;
+      while (await db.findEmployeeByUsername(finalUsername)) {
+        finalUsername = `${username}${counter}`;
+        counter++;
+      }
+
+      const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+      
+      employee = await db.createEmployee({
+        username: finalUsername,
+        passwordHash,
+        fullName,
+        role,
+        microsoftUserId: user.id,
+        microsoftEmail: email,
+        location: null,
+        timezone: null,
+        dailyBreakAllowanceMinutes: 60,
+      });
+
+      req.session.employeeId = employee.id;
+      req.session.userId = employee.id;
+      req.session.loginAt = new Date().toISOString();
+      req.session.microsoftUserId = user.id;
+      
+      return res.redirect('/#dashboard');
+    }
+  } catch (err) {
+    console.error("Microsoft callback error:", err);
+    res.redirect('/#login?error=microsoft_auth_failed');
   }
 });
 

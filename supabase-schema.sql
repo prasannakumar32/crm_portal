@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS employees (
   location TEXT,
   timezone TEXT,
   daily_break_allowance_minutes INTEGER DEFAULT 60,
+  microsoft_user_id TEXT UNIQUE,
+  microsoft_email TEXT UNIQUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -30,6 +32,8 @@ CREATE TABLE IF NOT EXISTS users (
   location TEXT,
   timezone TEXT,
   daily_break_allowance_minutes INTEGER DEFAULT 60,
+  microsoft_user_id TEXT UNIQUE,
+  microsoft_email TEXT UNIQUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

@@ -34,14 +34,10 @@ function createHolidaysTemplate() {
   const holidayRows = holidays.map((holiday, index) => {
     const dateParts = holidayDateParts(holiday.date);
     if (!dateParts) return "";
-    const actions = state.user?.role === "admin" && holiday.created ? `
+    const adminActions = state.user?.role === "admin" ? `
           <div class="holiday-actions">
-            <button class="mini-action icon-action" type="button" title="Edit holiday" aria-label="Edit holiday" data-action="edit-holiday" data-id="${holiday.id}"><span class="material-symbols-outlined" aria-hidden="true">edit</span></button>
-            <button class="mini-action danger icon-action" type="button" title="Delete holiday" aria-label="Delete holiday" data-action="delete-holiday" data-id="${holiday.id}"><span class="material-symbols-outlined" aria-hidden="true">delete</span></button>
-          </div>` : "";
-    const publicActions = state.user?.role === "admin" && !holiday.created ? `
-          <div class="holiday-actions">
-            <button class="mini-action icon-action" type="button" title="Edit public holiday" aria-label="Edit public holiday" data-action="edit-public-holiday" data-date="${holiday.date}"><span class="material-symbols-outlined" aria-hidden="true">edit</span></button>
+            <button class="mini-action icon-action" type="button" title="${holiday.created ? "Edit holiday" : "Edit public holiday"}" aria-label="${holiday.created ? "Edit holiday" : "Edit public holiday"}" data-action="${holiday.created ? "edit-holiday" : "edit-public-holiday"}" data-id="${holiday.id || ""}" data-date="${holiday.date}"><span class="material-symbols-outlined" aria-hidden="true">edit</span></button>
+            <button class="mini-action danger icon-action" type="button" title="${holiday.created ? "Delete holiday" : "Remove holiday"}" aria-label="${holiday.created ? "Delete holiday" : "Remove holiday"}" data-action="delete-holiday" data-id="${holiday.id || ""}" data-date="${holiday.date}"><span class="material-symbols-outlined" aria-hidden="true">delete</span></button>
           </div>` : "";
     return `
       <div class="holiday-row">
@@ -51,7 +47,7 @@ function createHolidaysTemplate() {
           <div class="holiday-place">${holiday.created ? (holiday.reason || "Added holiday") : `${holiday.name && holiday.name !== holiday.localName ? holiday.name : `${countryName} public holiday`}`}</div>
           <div class="holiday-meta">${dateParts.full}</div>
           <div class="holiday-status status-approved">${holiday.created ? "Added holiday" : "Public holiday"}</div>
-          ${actions || publicActions}
+          ${adminActions}
         </div>
       </div>`;
   }).join("");
@@ -107,12 +103,17 @@ function renderHolidays() {
     }
     for (const button of document.querySelectorAll("[data-action='delete-holiday']")) {
       button.addEventListener("click", async () => {
-        if (!confirm("Delete this holiday?")) return;
+        const isCreatedHoliday = Boolean(button.dataset.id);
+        if (!confirm(isCreatedHoliday ? "Delete this holiday?" : "Remove this holiday from the list?")) return;
         try {
-          await deleteLeave(button.dataset.id);
-          await loadLeaves();
+          if (isCreatedHoliday) {
+            await deleteLeave(button.dataset.id);
+            await loadLeaves();
+          } else {
+            state.holidayData = (state.holidayData || []).filter((item) => item.date !== button.dataset.date);
+          }
           state.holidayEditTarget = null;
-          showSuccess("Holiday deleted successfully.");
+          showSuccess(isCreatedHoliday ? "Holiday deleted successfully." : "Holiday removed from the list.");
           renderHolidays();
         } catch (error) {
           console.error("Failed to delete holiday:", error);
