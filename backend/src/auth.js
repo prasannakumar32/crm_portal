@@ -9,6 +9,22 @@ const router = express.Router();
 
 const USERNAME_RE = /^[a-zA-Z0-9_.]{3,32}$/;
 
+function getConfiguredAppUrl(req) {
+  const configured = process.env.APP_URL || process.env.PUBLIC_APP_URL || process.env.FRONTEND_URL || process.env.SUPABASE_REDIRECT_URL;
+  if (configured) {
+    return configured.replace(/\/+$/, "");
+  }
+
+  const host = req && req.get ? req.get("host") : "localhost:3333";
+  const protocol = req && req.protocol ? req.protocol : "http";
+  return `${protocol}://${host}`;
+}
+
+function getMicrosoftOAuthRedirectUrl(req) {
+  const appUrl = getConfiguredAppUrl(req);
+  return new URL("/#microsoft-callback", appUrl).toString();
+}
+
 async function canManageEmployees(req, res, next) {
   try {
     const employees = await db.getEmployees();
@@ -233,10 +249,13 @@ router.put("/employees/:id/break-allowance", canManageEmployees, async (req, res
 // Microsoft OAuth Login
 router.get("/microsoft/login", async (req, res) => {
   try {
+    const redirectTo = getMicrosoftOAuthRedirectUrl(req);
+    console.log("Microsoft OAuth redirect configured to:", redirectTo);
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'azure',
       options: {
-        redirectTo: `${req.protocol}://${req.get('host')}/#microsoft-callback`,
+        redirectTo,
         scopes: 'openid profile email',
         skipBrowserRedirect: false
       }

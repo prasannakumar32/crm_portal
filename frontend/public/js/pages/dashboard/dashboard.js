@@ -492,15 +492,21 @@ function renderDashboard() {
 function renderLogin() {
   root.innerHTML = renderLoginForm();
 
-  setError(state.error);
+  const redirectError = new URLSearchParams(location.search).get("error");
+  if (redirectError) {
+    setError("Microsoft sign-in failed. Please try again.");
+    history.replaceState(null, null, `${location.pathname}${location.hash}`);
+  } else {
+    setError(state.error);
+  }
   
   // Microsoft login button handler
   const microsoftBtn = document.getElementById("microsoft-login-btn");
   if (microsoftBtn) {
     microsoftBtn.addEventListener("click", async () => {
       try {
-        // Redirect to backend to initiate OAuth
-        window.location.href = "/api/auth/microsoft/login";
+        const microsoftLoginUrl = `${API_BASE_URL}/api/auth/microsoft/login`;
+        window.location.href = microsoftLoginUrl;
       } catch (err) {
         setError("Failed to initiate Microsoft login");
       }
