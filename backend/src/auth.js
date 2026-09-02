@@ -22,7 +22,7 @@ function getConfiguredAppUrl(req) {
 
 function getMicrosoftOAuthRedirectUrl(req) {
   const appUrl = getConfiguredAppUrl(req);
-  return new URL("/#microsoft-callback", appUrl).toString();
+  return new URL("/", appUrl).toString();
 }
 
 async function canManageEmployees(req, res, next) {
