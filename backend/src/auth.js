@@ -285,16 +285,17 @@ router.post("/microsoft/sync", async (req, res) => {
     const { accessToken, email, fullName, microsoftUserId } = req.body || {};
     
     if (!email || !microsoftUserId) {
-      return res.status(400).json({ error: "Missing required fields" });
+      console.error("Microsoft sync error: Missing required fields", { email, microsoftUserId, hasAccessToken: !!accessToken });
+      return res.status(400).json({ error: "Missing required fields: email and microsoftUserId" });
     }
 
-    console.log("Syncing Microsoft user:", email);
+    console.log("Syncing Microsoft user:", { email, hasAccessToken: !!accessToken, microsoftUserId: microsoftUserId.substring(0, 8) + '...' });
     
     // Try to find existing employee by email
     let employee = await db.findEmployeeByEmail(email);
 
     if (employee) {
-      console.log("Found existing employee, linking Microsoft account");
+      console.log("Found existing employee, linking Microsoft account:", employee.id);
       // Link Microsoft account to existing employee
       await db.updateEmployee(employee.id, { 
         microsoftUserId: microsoftUserId,
@@ -317,7 +318,7 @@ router.post("/microsoft/sync", async (req, res) => {
         loggedInAt: req.session.loginAt,
       });
     } else {
-      console.log("Creating new employee account");
+      console.log("Creating new employee account from Microsoft login");
       // Create new employee account
       const employees = await db.getEmployees();
       const role = employees.length === 0 ? "admin" : "employee";
@@ -346,6 +347,8 @@ router.post("/microsoft/sync", async (req, res) => {
         dailyBreakAllowanceMinutes: 60,
       });
 
+      console.log("Created new employee account:", { id: employee.id, username: finalUsername, role });
+
       req.session.employeeId = employee.id;
       req.session.userId = employee.id;
       req.session.loginAt = new Date().toISOString();
@@ -363,8 +366,8 @@ router.post("/microsoft/sync", async (req, res) => {
       });
     }
   } catch (err) {
-    console.error("Microsoft sync error:", err);
-    res.status(500).json({ error: "Failed to sync Microsoft user" });
+    console.error("Microsoft sync error:", err.message || err);
+    res.status(500).json({ error: "Failed to sync Microsoft user: " + (err.message || "Unknown error") });
   }
 });
 

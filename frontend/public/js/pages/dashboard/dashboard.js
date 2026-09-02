@@ -631,33 +631,40 @@ async function handleMicrosoftCallback() {
 
     if (error) {
       console.error("[Microsoft OAuth] Callback returned an OAuth error", { error, errorDescription, href: location.href });
-      setError("Microsoft sign-in failed. Please try again.");
+      setError(`Microsoft sign-in failed: ${errorDescription}`);
       return;
     }
 
     if (!accessToken) {
       console.error("[Microsoft OAuth] No access token in callback URL", { href: location.href, search: location.search, hash: location.hash });
-      setError("Microsoft authentication failed - no access token");
+      setError("Microsoft authentication failed - no access token received");
       return;
     }
     
     // Use the access token to get user info from Supabase
+    console.log("[Microsoft OAuth] Fetching user info with access token");
     const userInfo = await apiJson("/api/auth/microsoft/userinfo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ accessToken }),
     });
     
+    console.log("[Microsoft OAuth] Got user info:", { email: userInfo.email, fullName: userInfo.fullName });
+    
     // Sync with our backend
+    console.log("[Microsoft OAuth] Syncing with backend");
     const data = await apiJson("/api/auth/microsoft/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ 
         email: userInfo.email, 
         fullName: userInfo.fullName, 
-        microsoftUserId: userInfo.id 
+        microsoftUserId: userInfo.id,
+        accessToken: accessToken
       }),
     });
+    
+    console.log("[Microsoft OAuth] Sync successful, logged in as:", data.username);
     
     state.employee = data;
     state.user = state.employee;
@@ -669,8 +676,8 @@ async function handleMicrosoftCallback() {
     // Clear the hash
     history.replaceState(null, null, ' ');
   } catch (err) {
-    console.error("Microsoft callback error:", err);
-    setError(err.error || "Microsoft authentication failed");
+    console.error("[Microsoft OAuth] Callback error:", err);
+    setError(`Microsoft authentication failed: ${err.error || err.message || "Unknown error"}`);
   }
 }
 

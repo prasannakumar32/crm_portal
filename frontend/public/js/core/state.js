@@ -39,9 +39,9 @@ const enabledByStatus = {
   checked_out: [],
 };
 
-const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? "http://localhost:3333"
-  : (window.location.origin || "");
+// API_BASE_URL: Use localhost:3333 for local development, window.location.origin for production
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_BASE_URL = isLocalhost ? "http://localhost:3333" : window.location.origin;
 
 const SCHEDULE_STORAGE_KEY = "crm-portal-work-schedules";
 
