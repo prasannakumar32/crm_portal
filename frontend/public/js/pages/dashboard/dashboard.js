@@ -497,9 +497,19 @@ function renderLogin() {
   // Microsoft login button handler
   const microsoftBtn = document.getElementById("microsoft-login-btn");
   if (microsoftBtn) {
-    microsoftBtn.addEventListener("click", () => {
-      window.location.href = "/api/auth/microsoft/login";
+    microsoftBtn.addEventListener("click", async () => {
+      try {
+        // Redirect to backend to initiate OAuth
+        window.location.href = "/api/auth/microsoft/login";
+      } catch (err) {
+        setError("Failed to initiate Microsoft login");
+      }
     });
+  }
+  
+  // Check for Microsoft OAuth callback in URL hash
+  if (location.hash.includes("access_token")) {
+    handleMicrosoftCallback();
   }
   
   const form = document.getElementById("login-form");
@@ -565,6 +575,50 @@ function renderLogin() {
         toggleBtn.click();
       }
     });
+  }
+}
+
+async function handleMicrosoftCallback() {
+  try {
+    // Parse the hash to get access token
+    const hashParams = new URLSearchParams(location.hash.substring(1));
+    const accessToken = hashParams.get("access_token");
+    
+    if (!accessToken) {
+      setError("Microsoft authentication failed - no access token");
+      return;
+    }
+    
+    // Use the access token to get user info from Supabase
+    const userInfo = await apiJson("/api/auth/microsoft/userinfo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessToken }),
+    });
+    
+    // Sync with our backend
+    const data = await apiJson("/api/auth/microsoft/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        email: userInfo.email, 
+        fullName: userInfo.fullName, 
+        microsoftUserId: userInfo.id 
+      }),
+    });
+    
+    state.employee = data;
+    state.user = state.employee;
+    hydrateProfileFromUser();
+    setPage("dashboard");
+    await loadToday();
+    await loadHistory();
+    
+    // Clear the hash
+    history.replaceState(null, null, ' ');
+  } catch (err) {
+    console.error("Microsoft callback error:", err);
+    setError(err.error || "Microsoft authentication failed");
   }
 }
 

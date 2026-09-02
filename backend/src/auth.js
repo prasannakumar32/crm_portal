@@ -234,18 +234,24 @@ router.put("/employees/:id/break-allowance", canManageEmployees, async (req, res
 router.get("/microsoft/login", async (req, res) => {
   try {
     const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'microsoft',
+      provider: 'azure',
       options: {
-        redirectTo: `${req.protocol}://${req.get('host')}/api/auth/microsoft/callback`,
-        scopes: 'openid profile email'
+        redirectTo: `${req.protocol}://${req.get('host')}/#microsoft-callback`,
+        scopes: 'openid profile email',
+        skipBrowserRedirect: false
       }
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase OAuth error:", error);
+      throw error;
+    }
 
     if (data.url) {
+      console.log("Redirecting to Microsoft OAuth URL:", data.url);
       res.redirect(data.url);
     } else {
+      console.error("No OAuth URL returned from Supabase");
       res.status(500).json({ error: "Failed to initiate Microsoft login" });
     }
   } catch (err) {
@@ -254,43 +260,45 @@ router.get("/microsoft/login", async (req, res) => {
   }
 });
 
-// Microsoft OAuth Callback
-router.get("/microsoft/callback", async (req, res) => {
+// Microsoft OAuth Callback (handled via Supabase session)
+router.post("/microsoft/sync", async (req, res) => {
   try {
-    const { code } = req.query;
+    const { accessToken, email, fullName, microsoftUserId } = req.body || {};
     
-    if (!code) {
-      return res.redirect('/#login?error=microsoft_auth_failed');
+    if (!email || !microsoftUserId) {
+      return res.status(400).json({ error: "Missing required fields" });
     }
 
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-
-    if (error || !data.user) {
-      console.error("Microsoft callback error:", error);
-      return res.redirect('/#login?error=microsoft_auth_failed');
-    }
-
-    const { user, session } = data;
-    const email = user.email;
-    const fullName = user.user_metadata?.full_name || user.user_metadata?.name || email.split('@')[0];
-
+    console.log("Syncing Microsoft user:", email);
+    
     // Try to find existing employee by email
     let employee = await db.findEmployeeByEmail(email);
 
     if (employee) {
+      console.log("Found existing employee, linking Microsoft account");
       // Link Microsoft account to existing employee
       await db.updateEmployee(employee.id, { 
-        microsoftUserId: user.id,
+        microsoftUserId: microsoftUserId,
         microsoftEmail: email 
       });
       
       req.session.employeeId = employee.id;
       req.session.userId = employee.id;
       req.session.loginAt = new Date().toISOString();
-      req.session.microsoftUserId = user.id;
+      req.session.microsoftUserId = microsoftUserId;
       
-      return res.redirect('/#dashboard');
+      return res.json({
+        id: employee.id,
+        username: employee.username,
+        fullName: employee.fullName,
+        role: employee.role,
+        location: employee.location || null,
+        timezone: employee.timezone || null,
+        dailyBreakAllowanceMinutes: employee.dailyBreakAllowanceMinutes || 60,
+        loggedInAt: req.session.loginAt,
+      });
     } else {
+      console.log("Creating new employee account");
       // Create new employee account
       const employees = await db.getEmployees();
       const role = employees.length === 0 ? "admin" : "employee";
@@ -310,9 +318,9 @@ router.get("/microsoft/callback", async (req, res) => {
       employee = await db.createEmployee({
         username: finalUsername,
         passwordHash,
-        fullName,
+        fullName: fullName || email.split('@')[0],
         role,
-        microsoftUserId: user.id,
+        microsoftUserId: microsoftUserId,
         microsoftEmail: email,
         location: null,
         timezone: null,
@@ -322,13 +330,54 @@ router.get("/microsoft/callback", async (req, res) => {
       req.session.employeeId = employee.id;
       req.session.userId = employee.id;
       req.session.loginAt = new Date().toISOString();
-      req.session.microsoftUserId = user.id;
+      req.session.microsoftUserId = microsoftUserId;
       
-      return res.redirect('/#dashboard');
+      return res.json({
+        id: employee.id,
+        username: employee.username,
+        fullName: employee.fullName,
+        role: employee.role,
+        location: employee.location || null,
+        timezone: employee.timezone || null,
+        dailyBreakAllowanceMinutes: employee.dailyBreakAllowanceMinutes || 60,
+        loggedInAt: req.session.loginAt,
+      });
     }
   } catch (err) {
-    console.error("Microsoft callback error:", err);
-    res.redirect('/#login?error=microsoft_auth_failed');
+    console.error("Microsoft sync error:", err);
+    res.status(500).json({ error: "Failed to sync Microsoft user" });
+  }
+});
+
+// Get user info from access token
+router.post("/microsoft/userinfo", async (req, res) => {
+  try {
+    const { accessToken } = req.body || {};
+    
+    if (!accessToken) {
+      return res.status(400).json({ error: "Missing access token" });
+    }
+
+    // Use Supabase to get user info from the access token
+    const { data, error } = await supabase.auth.getUser(accessToken);
+
+    if (error || !data.user) {
+      console.error("Failed to get user info:", error);
+      return res.status(400).json({ error: "Invalid access token" });
+    }
+
+    const user = data.user;
+    const email = user.email;
+    const fullName = user.user_metadata?.full_name || user.user_metadata?.name || email.split('@')[0];
+
+    res.json({
+      id: user.id,
+      email: email,
+      fullName: fullName,
+    });
+  } catch (err) {
+    console.error("User info error:", err);
+    res.status(500).json({ error: "Failed to get user info" });
   }
 });
 
