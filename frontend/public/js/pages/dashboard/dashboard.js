@@ -492,10 +492,29 @@ function renderDashboard() {
 function renderLogin() {
   root.innerHTML = renderLoginForm();
 
-  const redirectError = new URLSearchParams(location.search).get("error");
-  if (redirectError) {
+  const searchParams = new URLSearchParams(location.search);
+  const hashParams = new URLSearchParams((location.hash || "").replace(/^#/, ""));
+  const oauthError = searchParams.get("error") || hashParams.get("error");
+  const oauthErrorDescription = searchParams.get("error_description") || hashParams.get("error_description") || "Unknown OAuth error";
+
+  console.log("[Microsoft OAuth] Login page loaded", {
+    href: location.href,
+    search: location.search,
+    hash: location.hash,
+    error: oauthError,
+    errorDescription: oauthErrorDescription,
+    hashParams: Object.fromEntries(hashParams.entries()),
+    searchParams: Object.fromEntries(searchParams.entries()),
+  });
+
+  if (oauthError) {
+    console.error("[Microsoft OAuth] Error returned from provider", {
+      error: oauthError,
+      errorDescription: oauthErrorDescription,
+      href: location.href,
+    });
     setError("Microsoft sign-in failed. Please try again.");
-    history.replaceState(null, null, `${location.pathname}${location.hash}`);
+    history.replaceState(null, null, `${location.pathname}${location.hash ? "" : ""}`);
   } else {
     setError(state.error);
   }
@@ -506,15 +525,23 @@ function renderLogin() {
     microsoftBtn.addEventListener("click", async () => {
       try {
         const microsoftLoginUrl = `${API_BASE_URL}/api/auth/microsoft/login`;
+        console.log("[Microsoft OAuth] Starting login redirect", { url: microsoftLoginUrl });
         window.location.href = microsoftLoginUrl;
       } catch (err) {
+        console.error("[Microsoft OAuth] Failed to start login", err);
         setError("Failed to initiate Microsoft login");
       }
     });
   }
   
-  // Check for Microsoft OAuth callback in URL hash
-  if (location.hash.includes("access_token")) {
+  // Check for Microsoft OAuth callback in URL hash or query string
+  const accessToken = searchParams.get("access_token") || hashParams.get("access_token");
+  if (accessToken) {
+    console.log("[Microsoft OAuth] Access token detected, processing callback", {
+      hasAccessToken: true,
+      hash: location.hash,
+      search: location.search,
+    });
     handleMicrosoftCallback();
   }
   
@@ -586,11 +613,30 @@ function renderLogin() {
 
 async function handleMicrosoftCallback() {
   try {
-    // Parse the hash to get access token
-    const hashParams = new URLSearchParams(location.hash.substring(1));
-    const accessToken = hashParams.get("access_token");
-    
+    const searchParams = new URLSearchParams(location.search);
+    const hashParams = new URLSearchParams((location.hash || "").replace(/^#/, ""));
+    const accessToken = searchParams.get("access_token") || hashParams.get("access_token");
+    const error = searchParams.get("error") || hashParams.get("error");
+    const errorDescription = searchParams.get("error_description") || hashParams.get("error_description") || "Unknown OAuth error";
+
+    console.log("[Microsoft OAuth] Callback payload", {
+      href: location.href,
+      search: location.search,
+      hash: location.hash,
+      error,
+      errorDescription,
+      accessTokenLength: accessToken ? accessToken.length : 0,
+      accessTokenPreview: accessToken ? `${accessToken.slice(0, 30)}...` : null,
+    });
+
+    if (error) {
+      console.error("[Microsoft OAuth] Callback returned an OAuth error", { error, errorDescription, href: location.href });
+      setError("Microsoft sign-in failed. Please try again.");
+      return;
+    }
+
     if (!accessToken) {
+      console.error("[Microsoft OAuth] No access token in callback URL", { href: location.href, search: location.search, hash: location.hash });
       setError("Microsoft authentication failed - no access token");
       return;
     }
