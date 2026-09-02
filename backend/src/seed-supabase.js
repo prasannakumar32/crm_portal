@@ -10,22 +10,27 @@ const { supabase } = require("./supabase");
 // Sample seed data with 3 users
 const SEED_USERS = [
   {
+    id: "t_0001",
     username: "prasanna",
     password: "Prasanna@123",
     fullName: "Prasanna",
     role: "employee",
     location: "India",
     timezone: "Asia/Kolkata",
+    microsoftEmail: "prasanna@tmarktechs.com",
   },
   {
+    id: "t_0002",
     username: "muthu",
     password: "Muthu@123",
     fullName: "Muthu",
     role: "admin",
     location: "Australia",
     timezone: "Australia/Sydney",
+    microsoftEmail: "prasanna@tmarktechs.com.au",
   },
   {
+    id: "t_0003",
     username: "kishanthi",
     password: "Kishanthi@123",
     fullName: "Kishanthi",
@@ -201,13 +206,14 @@ async function seedDatabase() {
     console.log("👥 Creating users...");
     const createdEmployees = [];
     for (const userData of SEED_USERS) {
-      const { username, password, fullName, role, location, timezone } = userData;
+      const { id, username, password, fullName, role, location, timezone } = userData;
       
       // Hash password
       const passwordHash = await bcrypt.hash(password, 10);
       
-      // Create employee document
+      // Create employee document with custom ID
       const employee = {
+        id,
         username,
         normalized_username: username.toLowerCase(),
         password_hash: passwordHash,
@@ -216,6 +222,7 @@ async function seedDatabase() {
         location,
         timezone,
         daily_break_allowance_minutes: 60,
+        microsoft_email: userData.microsoftEmail || null,
       };
 
       const { data, error } = await supabase

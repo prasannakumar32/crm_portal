@@ -296,12 +296,15 @@ router.post("/microsoft/sync", async (req, res) => {
 
     if (employee) {
       console.log("Found existing employee, linking Microsoft account:", employee.id);
-      // Link Microsoft account to existing employee
-      await db.updateEmployee(employee.id, { 
+      // Link Microsoft account to existing employee while preserving the backend-managed username.
+      await db.updateEmployee(employee.id, {
+        username: employee.username,
+        fullName: employee.fullName,
+        role: employee.role,
         microsoftUserId: microsoftUserId,
-        microsoftEmail: email 
+        microsoftEmail: email,
       });
-      
+
       req.session.employeeId = employee.id;
       req.session.userId = employee.id;
       req.session.loginAt = new Date().toISOString();

@@ -146,7 +146,7 @@ async function createEmployee({ username, passwordHash, fullName, role = "employ
     username: username.trim(),
     normalized_username: normalizedUsername,
     password_hash: passwordHash,
-    full_name: fullName.trim(),
+    full_name: fullName ? fullName.trim() : null,
     role,
     location: location || null,
     timezone: timezone || null,
@@ -170,18 +170,29 @@ async function createEmployee({ username, passwordHash, fullName, role = "employ
 }
 
 async function updateEmployee(id, { username, passwordHash, fullName, role, location, timezone, microsoftUserId, microsoftEmail }) {
-  const updates = {
-    username: username.trim(),
-    normalized_username: username.trim().toLowerCase(),
-    full_name: fullName.trim(),
-    role,
-    location: location || null,
-    timezone: timezone || null,
-  };
+  const updates = {};
+
+  if (username !== undefined && username !== null) {
+    const safeUsername = String(username).trim();
+    updates.username = safeUsername;
+    updates.normalized_username = safeUsername.toLowerCase();
+  }
+
+  if (fullName !== undefined && fullName !== null) {
+    updates.full_name = String(fullName).trim() || null;
+  }
+
+  if (role !== undefined) updates.role = role;
+  if (location !== undefined) updates.location = location || null;
+  if (timezone !== undefined) updates.timezone = timezone || null;
   if (passwordHash) updates.password_hash = passwordHash;
   if (microsoftUserId) updates.microsoft_user_id = microsoftUserId;
   if (microsoftEmail) updates.microsoft_email = microsoftEmail;
-  
+
+  if (Object.keys(updates).length === 0) {
+    return null;
+  }
+
   const { data, error } = await supabase
     .from('employees')
     .update(updates)
